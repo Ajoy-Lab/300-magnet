@@ -1,0 +1,706 @@
+%%%%% INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function varargout = NVCommandCenter(varargin)
+
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+    'gui_Singleton',  gui_Singleton, ...
+    'gui_OpeningFcn', @NVCommandCenter_OpeningFcn, ...
+    'gui_OutputFcn',  @NVCommandCenter_OutputFcn, ...
+    'gui_LayoutFcn',  [] , ...
+    'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+% --- Executes just before NVCommandCenter is made visible.
+function NVCommandCenter_OpeningFcn(hObject, eventdata, handles, varargin)
+
+% Pass on handles from Imaging
+gobj = findall(0,'Name','Imaging');
+IAhandles = guidata(gobj);
+
+handles.NVCCF = NVCommandCenterFunctions();
+% Choose default command line output for NVCommandCenter
+handles.output = hObject;
+
+handles.PulseGenerator = IAhandles.PulseGenerator;
+
+%Tracker handles %%%%%%%%%%%%%%%%%%%%%%
+%handles.Tracker=handles.hIAF.Tracker;
+
+%handles.Tracker.hIAF = handles.hIAF; %this will fail if image acquistion handle is not found
+%%%%%%%%%%%%%%%%%%%%%%
+
+handles.PulseSequence = PulseSequence();
+
+LaserOn=get(IAhandles.toggle_LaserOnOff,'Value');
+if LaserOn
+    set(IAhandles.toggle_LaserOnOff,'Value',0);
+    
+    if IAhandles.QEGhandles.pulse_mode
+        
+        handles.PulseGenerator.PBStop();
+        
+    else
+        handles.PulseGenerator.open();
+        handles.PulseGenerator.SetChannelOff(1);
+        handles.PulseGenerator.close();
+        
+    end
+    set(IAhandles.toggle_LaserOnOff,'String','Laser Off')
+    set(IAhandles.toggle_LaserOnOff,'ForegroundColor',[0.0 0.487 0])
+    hwd=warndlg('Turning off the laser');
+    pause(1);
+    close(hwd);
+end
+
+% artificial assignment only to be used when running init script
+handles.x = IAhandles;
+[hObject,handles] = InitDevices(hObject,handles);
+
+InitGUI(hObject,handles);
+
+set(handles.figure1,'CloseRequestFcn',@closeNVCC);
+
+handles.Array_PSeq = {};
+
+%Initialize ExperimentalScan params
+handles.ExperimentalScan = ExperimentalScan();
+
+% load exps
+handles.NVCCF.updateExpScanList(eventdata,handles);
+
+%if using PB, display Sample Rate (fixed)
+if handles.x.QEGhandles.pulse_mode == 1 || handles.x.QEGhandles.pulse_mode == 2 %use PB or simu PB
+    set(handles.PB_sample_rate,'Visible','on');
+    set(handles.PB_sample_rate,'String',['PB Sample Rate = ' sprintf('%d',handles.x.PulseGenerator.SampleRate)]);
+end
+
+% Update handles structure
+guidata(hObject, handles);
+
+function [hObject,handles] = InitDevices(hObject,handles)
+
+script = 'NVCommandCenter_InitScript.m';
+[hObject,handles] = feval(script(1:end-2),hObject,handles);
+set(handles.text_ExpStatus,'String','Init script has been run');
+
+function [] = InitGUI(~,~)
+
+% --- Outputs from this function are returned to the command line.
+function varargout = NVCommandCenter_OutputFcn(~, ~, handles)
+
+varargout{1} = handles.output;
+
+function closeNVCC(~,~,~)
+
+gobj = findall(0,'Name','QEG');
+myhandles = guidata(gobj);
+myhandles.flag_nvcommandcenter = 0;
+set(myhandles.button_experiment,'Enable', 'on');
+set(myhandles.button_imaging,'Enable','off');
+guidata(gobj, myhandles);
+delete(gcf);
+
+%%%%% END INITIALIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%% TOOLBARS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function menuFile_Callback(~, ~, ~)
+
+function menuTools_Callback(~, ~, ~)
+
+function menuPopoutImageExp_Callback(~, ~, handles)
+
+hF = figure();
+copyobj(handles.axes_AvgData,hF);
+A = get(hF,'Children');
+P = get(A,'OuterPosition');
+set(A,'OuterPosition',[-4 -2 P(3) P(4)]);
+
+function menuExportImageExp_Callback(~, ~, handles)
+
+fp = getpref('nv','SavedExpDirectory');
+[fn,fp] = uiputfile({'*.jpg','*.jpeg'},'Save Image...',fullfile(fp,'ExportedImages'));
+
+hF = figure('Visible','off');
+copyobj(handles.axes_AvgData,hF);
+A = get(hF,'Children');
+P = get(A,'OuterPosition');
+set(A,'OuterPosition',[.2 .2 P(3) P(4)]);
+saveas(hF,fullfile(fp,fn));
+
+function uitoggletool1_OnCallback(~, ~, ~)
+datacursormode on;
+
+function uitoggletool1_OffCallback(~, ~, ~)
+datacursormode off;
+
+function menuAutoSaveExp_Callback(hObject, ~, ~)
+
+% toggle the state of the AutoSave check box
+switch get(hObject,'checked');
+    case 'on'
+        set(hObject,'checked','off');
+    case 'off'
+        set(hObject,'checked','on');
+end
+
+function menuSavedExpDir_Callback(~, ~, ~)
+
+d = getpref('nv','SavedExpDirectory');
+
+a = uigetdir(d,'Choose Default Saved Experiment Directory');
+setpref('nv','SavedExpDirectory',a);
+
+%%%%% END TOOLBARS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%% SEQUENCE PANEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function button_EditSeq_CreateFcn(~, ~, ~)
+
+% --- Executes on button press in button_EditSeq.
+function button_EditSeq_Callback(~, ~, handles)
+open(handles.Sequencename)
+
+% --- Executes on button press in botton_LoadSeq.
+function botton_LoadSeq_Callback(hObject, ~, handles)
+
+fp = getpref('nv','SavedSequenceDirectory');
+[file] = uigetfile('*.xml', 'Choose existing sequence file to load',fp);
+
+if file ~= 0
+    [vars_cell, sequence_code] = get_sequence(file);
+    set(handles.text_SequenceName,'String',file);
+else
+    uiwait(warndlg({'Sequence file not loaded. Aborted.'}));
+    return;
+end
+
+handles.Seq_vars = vars_cell;
+handles.Sequence_code = sequence_code;
+handles.Data_float = {};
+handles.Data_bool = {};
+handles.Sequencename = file;
+
+for aux=1:1:length(vars_cell)
+    
+    if strcmp(vars_cell{aux}.variable_type, 'float')
+        handles.Data_float{end+1,1} = vars_cell{aux}.name;
+        handles.Data_float{end,2} = vars_cell{aux}.default_value;
+        handles.Data_float{end,3} = false;
+        handles.Data_float{end,4} = '';
+        handles.Data_float{end,5} = '';
+        handles.Data_float{end,6} = '';
+        
+    elseif strcmp(vars_cell{aux}.variable_type, 'boolean')
+        handles.Data_bool{end+1,1} = logical(vars_cell{aux}.default_value);
+        handles.Data_bool{end,2} = vars_cell{aux}.name;
+        
+    end
+    
+end
+
+set(handles.table_float,'Data',handles.Data_float);
+set(handles.table_bool,'Data', handles.Data_bool);
+
+% Update handles structure
+guidata(hObject, handles);
+
+% --- Executes when entered data in editable cell(s) in table_float.
+function table_float_CellEditCallback(hObject, ~, handles)
+
+tabledata = get(hObject, 'data');
+handles.Data_float = tabledata;
+a = size(tabledata);
+
+vary_on = 0;
+for p=1:1:a(1)  %number of lines in matrix
+    if tabledata{p,3} == true
+        handles.Var_to_be_varied = p;
+        handles.Name_var_to_be_varied = tabledata{p,1};
+        vary_on = 1;
+    end
+end
+
+if vary_on && ~isempty(handles.Data_float{handles.Var_to_be_varied,4}) && ~isempty(handles.Data_float{handles.Var_to_be_varied,5}) && ~isempty(handles.Data_float{handles.Var_to_be_varied,6})
+    set(handles.button_SetScan,'Enable', 'on');
+else
+    set(handles.button_SetScan,'Enable', 'off');
+end
+
+set(hObject,'Data',handles.Data_float);
+
+% Update handles structure
+guidata(hObject, handles);
+
+% --- Executes when entered data in editable cell(s) in table_bool.
+function table_bool_CellEditCallback(hObject, ~, handles)
+
+handles.Data_bool = get(hObject,'data');
+
+% Update handles structure
+guidata(hObject, handles);
+
+% --- Executes on button press in button_SetScan.
+function button_SetScan_Callback(hObject, ~, handles)
+
+set(handles.average_continuously,'Enable','on');
+
+scan_var_nb = handles.Var_to_be_varied;
+
+%Set name of sequence
+handles.ExperimentalScan.SequenceName = handles.Sequencename;
+handles.ExperimentalScan.vary_prop =  handles.Name_var_to_be_varied;
+
+%Save sequence file in ExperimentalScan
+fid = fopen(handles.Sequencename);
+tline = fgets(fid);
+while ischar(tline)
+    handles.ExperimentalScan.Sequence = [handles.ExperimentalScan.Sequence tline];
+    tline = fgets(fid);
+end
+
+%Set first scan dimension params
+handles.ExperimentalScan.vary_begin = ParseInput(handles.Data_float{scan_var_nb, 4});
+handles.ExperimentalScan.vary_step_size = ParseInput(handles.Data_float{scan_var_nb, 5});
+handles.ExperimentalScan.vary_end = ParseInput(handles.Data_float{scan_var_nb, 6});
+
+% initialize scan
+clear scan;
+scan = handles.ExperimentalScan.vary_begin:handles.ExperimentalScan.vary_step_size:handles.ExperimentalScan.vary_end;
+handles.ExperimentalScan.vary_points = length(scan);
+
+if abs(scan(end) - handles.ExperimentalScan.vary_end) > 1e-12 
+    warndlg(sprintf('Note that end point in scan will be %d and not %d because of scan step size.', scan(end),handles.ExperimentalScan.vary_end))
+end
+
+% toggle through all scanning points and make an array of sequences
+handles.Array_PSeq = {};
+
+var_value_coerced.value = false;
+var_value_coerced.name = '';
+
+for aux=1:1:length(scan)
+    
+    % change the current value
+    handles.Data_float{scan_var_nb, 2} = scan(aux);
+    
+    [Current_PSeq,Variable_values,Bool_values,coerced_hlp] = make_pulse_sequence(handles.Sequence_code, handles.Seq_vars, handles.Data_float, handles.Data_bool);
+	var_value_coerced.value = var_value_coerced.value || coerced_hlp.value;
+	if coerced_hlp.value == true
+		var_value_coerced.name = coerced_hlp.name;
+	end
+    
+    handles.Array_PSeq = [handles.Array_PSeq Current_PSeq];
+    
+end
+
+handles.ExperimentalScan.Variable_values = Variable_values;
+handles.ExperimentalScan.Bool_values = Bool_values;
+
+if var_value_coerced.value == false
+	set(handles.button_StartExp,'Enable','on');
+else
+	uiwait(warndlg({['Variable ' var_value_coerced.name ' out of range. Set Scan aborted.']}));
+	set(handles.button_StartExp,'Enable','off');
+end
+
+guidata(hObject,handles);
+
+%%%%% END SEQUENCE PANEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%% EXPERIMENT PANEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+function button_StartExp_ButtonDownFcn(~, ~, ~)
+
+% --- Executes on button press in button_StartExp.
+function button_StartExp_Callback(~, eventdata, handles)
+handles.NVCCF.RunExperiment(eventdata,handles);
+
+% --- Executes on button press in button_StopExp.
+function button_StopExp_Callback(~, eventdata, handles)
+handles.NVCCF.abortRun(eventdata, handles);
+
+function edit_Averages_Callback(~, ~, ~)
+
+function edit_Averages_CreateFcn(hObject, ~, ~)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function edit_Repetitions_Callback(~, ~, ~)
+
+function edit_Repetitions_CreateFcn(hObject, ~, ~)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- Executes on button press in average_continuously.
+function average_continuously_Callback(hObject, ~, handles)
+
+if get(hObject,'Value')
+    set(handles.edit_Averages,'Enable','off');
+else
+    set(handles.edit_Averages,'Enable','on');
+end
+
+% --- Executes on selection change in popup_experiments.
+function popup_experiments_Callback(hObject, eventdata, handles)
+
+LoadExpFromScan(hObject,eventdata,handles);
+handles.NVCCF.updateExpScanList(eventdata,handles);
+
+function popup_experiments_CreateFcn(hObject, ~, ~)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function edit_NoteExp_Callback(~, ~, ~)
+
+function edit_NoteExp_CreateFcn(hObject, ~, ~)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- Executes on button press in button_NoteExp.
+function button_NoteExp_Callback(hObject, ~, handles)
+
+exps = get(handles.popup_experiments,'String');
+selectedExp = exps{get(handles.popup_experiments,'Value')};
+
+if strcmp(selectedExp,'Current Experiment')
+    handles.ExperimentalScan.Notes = get(handles.edit_NoteExp, 'String');
+    handles.NVCCF.SaveExp(handles);
+else
+    fp = getpref('nv','SavedExpDirectory');
+    load(fullfile(fp,selectedExp));
+    Scan.Notes = get(handles.edit_NoteExp, 'String');
+    save(fullfile(fp,selectedExp),'Scan');
+end
+
+% Update handles structure
+guidata(hObject, handles);
+
+function sliderExpScan_CreateFcn(hObject, ~, ~)
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+
+% --- Executes on slider movement.
+function sliderExpScan_Callback(hObject, ~, handles)
+
+exps = get(handles.popup_experiments,'String');
+selectedExp = exps{get(handles.popup_experiments,'Value')};
+
+if strcmp(selectedExp,'Current Experiment')
+    handles.ExperimentalScans = handles.ExperimentalScan;
+else
+    % load up images from saved file
+    fp = getpref('nv','SavedExpDirectory');
+    SavedExp = load(fullfile(fp,selectedExp));
+    handles.ExperimentalScans = SavedExp.Scan;
+end
+
+val = int32((get(handles.sliderExpScan,'Value')));
+set(handles.sliderExpScan,'Value',val);
+%set(handles.text_vary2_param,'String',sprintf('%s = %s',handles.ExperimentalScans.vary2_prop,num2str(double(handles.ExperimentalScans.vary2_begin) +double((val-1))*double((handles.ExperimentalScans.vary2_end-handles.ExperimentalScans.vary2_begin))/double((handles.ExperimentalScans.vary2_points-1)))));
+
+ExpPlot2d(handles,handles.ExperimentalScans,val);
+
+guidata(hObject, handles);
+
+function LoadExpFromScan(hObject,~,handles)
+
+set(handles.axes_RawData,'Visible','off');
+exps = get(handles.popup_experiments,'String');
+selectedExp= exps{get(hObject,'Value')};
+
+if strcmp(selectedExp,'Current Experiment')
+    set(handles.uipanel90,'Visible','off');
+    if ~isempty(handles.ExperimentalScan.ExperimentData)
+        fp = getpref('nv','SavedExpDirectory');
+        exps = get(handles.popup_experiments,'String');
+        selectedExp= exps{get(hObject,'Value')+1}; %loads the first exp in the list, that corresponds to the displayed 'Current Experiment'
+        SavedExp = load(fullfile(fp,selectedExp));
+        
+        handles.ExperimentalScanDisplayed = SavedExp.Scan;
+        set(handles.edit_NoteExp, 'String', handles.ExperimentalScanDisplayed.Notes)
+        set(handles.edit_NoteExp,'Enable','on');
+        set(handles.button_NoteExp,'Enable','on');
+        
+%         if ~isempty(handles.ExperimentalScan.vary2_channel) %2d scan
+%             set(handles.sliderExpScan,'Max', handles.ExperimentalScanDisplayed.vary2_points);
+%             set(handles.sliderExpScan,'Min', 1);
+%             set(handles.sliderExpScan,'Value', 1);
+%             set(handles.text_vary2_param,'String',sprintf('%s = %s',handles.ExperimentalScanDisplayed.vary2_prop,num2str(handles.ExperimentalScanDisplayed.vary2_begin)));
+%         end
+        
+    else
+        return;
+    end
+else
+    % load up images from saved file
+    fp = getpref('nv','SavedExpDirectory');
+    SavedExp = load(fullfile(fp,selectedExp));
+    
+    handles.ExperimentalScanDisplayed = SavedExp.Scan;
+    
+    set(handles.edit_NoteExp, 'String', handles.ExperimentalScanDisplayed.Notes)
+    set(handles.edit_NoteExp,'Enable','on');
+    set(handles.button_NoteExp,'Enable','on');
+    set(handles.uipanel90,'Visible','on');
+    
+    set(handles.text_scan_avg, 'String', handles.ExperimentalScanDisplayed.Averages);
+    set(handles.text_scan_reps, 'String', handles.ExperimentalScanDisplayed.Repetitions);
+    set(handles.text_sequence,'String',handles.ExperimentalScanDisplayed.Sequence);
+    set(handles.displayed_power,'String',sprintf('Power = %d mW',handles.ExperimentalScanDisplayed.Laserpower));
+    
+    
+    %     if ~isempty(handles.ExperimentalScanDisplayed.vary2_channel) %2d scan
+    %
+    %         set(handles.sliderExpScan,'Max', handles.ExperimentalScanDisplayed.vary2_points);
+    %         set(handles.sliderExpScan,'Min', 1);
+    %         set(handles.sliderExpScan,'Value', 1);
+    %         set(handles.text_vary2_param,'String',sprintf('%s = %s',handles.ExperimentalScanDisplayed.vary2_prop,num2str(handles.ExperimentalScanDisplayed.vary2_begin)));
+    %         set(handles.sliderExpScan,'Visible', 'on');
+    %         set(handles.text_vary2_param,'Visible', 'on');
+    %         ExpPlot2d(handles,handles.ExperimentalScanDisplayed,1);
+    %
+    %     else %1d scan
+    
+    ExpPlot1d(handles,handles.ExperimentalScanDisplayed);
+    set(handles.sliderExpScan,'Visible', 'off');
+    set(handles.text_vary2_param,'Visible', 'off');
+    
+    %     end
+    
+    set(handles.text_name_displayed_seq,'String',handles.ExperimentalScanDisplayed.SequenceName);
+    
+end
+
+%load veriable data to table_show_float
+a = size(handles.ExperimentalScanDisplayed.Variable_values);
+
+for p=1:1:a(2)  %number of lines in matrix
+    tabledata{p,1} = handles.ExperimentalScanDisplayed.Variable_values{p}.name;
+    tabledata{p,2} = handles.ExperimentalScanDisplayed.Variable_values{p}.value;
+
+    if strcmp(handles.ExperimentalScanDisplayed.Variable_values{p}.name, handles.ExperimentalScanDisplayed.vary_prop)
+        tabledata{p,3} = true;
+        tabledata{p,4} = handles.ExperimentalScanDisplayed.V
+    end
+end
+
+set(handles.table_show_float,'data',tabledata);
+
+%load veriable data to table_show_float
+a = size(handles.ExperimentalScanDisplayed.Bool_values);
+
+if a(2) ~= 0
+    for p=1:1:a(2)  %number of lines in matrix
+        tabledata{p,1} = handles.ExperimentalScanDisplayed.Bool_values{p}.name;
+        tabledata{p,2} = handles.ExperimentalScanDisplayed.Bool_values{p}.value;
+    end
+    
+    set(handles.table_show_bool,'data',tabledata);
+    
+end
+
+% Update handles structure
+guidata(hObject, handles);
+
+set(handles.button_NoteExp, 'Enable','on');
+set(handles.edit_NoteExp, 'Enable','on');
+
+gobj = findall(0,'Name','NVCommandCenter');
+guidata(gobj,handles);
+
+function [] = ExpPlot1d(handles, cImage)
+
+cla(handles.axes_RawData,'reset')
+set(handles.axes_RawData,'Visible','off');
+cla(handles.axes_AvgData,'reset')
+colors = ['b' 'k' 'y' 'g' 'm' 'r']; % enough for 6 rises of SPD Acq
+x = linspace(cImage.vary_begin,cImage.vary_end,cImage.vary_points);
+for j=1:1:length(cImage.ExperimentData{1})
+    y = cImage.ExperimentData{1}{j};
+    plot(x,y,['.-' colors(j)],'Parent',handles.axes_AvgData);
+    hold(handles.axes_AvgData,'on');
+end
+hold(handles.axes_AvgData,'off');
+a = {'Rise 1', 'Rise 2', 'Rise 3', 'Rise 4', 'Rise 5', 'Rise 6'};
+legend(handles.axes_AvgData,a(1:1:length(cImage.ExperimentData{1})));
+xlabel(handles.axes_AvgData,cImage.vary_prop);
+ylabel(handles.axes_AvgData,'kcps');
+drawnow();
+
+function [] = ExpPlot2d(handles, cImage,sliderValue)
+
+cla(handles.axes_RawData,'reset')
+set(handles.axes_RawData,'Visible','off');
+cla(handles.axes_AvgData,'reset')
+colors = ['b' 'k' 'y' 'g' 'm' 'r']; % enough for 6 rises of SPD Acq
+x = linspace(cImage.vary_begin,cImage.vary_end,cImage.vary_points);
+for j=1:1:length(cImage.ExperimentData{sliderValue})
+    y = cImage.ExperimentData{sliderValue}{j};
+    plot(x,y,['.-' colors(j)],'Parent',handles.axes_AvgData);
+    hold(handles.axes_AvgData,'on');
+end
+hold(handles.axes_AvgData,'off');
+a = {'Rise 1', 'Rise 2', 'Rise 3', 'Rise 4', 'Rise 5', 'Rise 6'};
+legend(handles.axes_AvgData,a(1:1:length(cImage.ExperimentData{sliderValue})));
+xlabel(handles.axes_AvgData,cImage.vary_prop);
+ylabel(handles.axes_AvgData,'kcps');
+drawnow();
+
+% --- Executes on button press in button_fit_data.
+function button_fit_data_Callback(~, ~, ~)
+
+function text_sequence_Callback(~, ~, ~)
+
+% --- Executes during object creation, after setting all properties.
+function text_sequence_CreateFcn(hObject, ~, ~)
+
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- Executes on selection change in curveSelect.
+function curveSelect_Callback(~, ~, ~)
+
+% --- Executes during object creation, after setting all properties.
+function curveSelect_CreateFcn(hObject, ~, ~)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function fitButton_Callback(~, ~, handles)
+%wrote by Jon Schneider April 2011
+
+threshold = 0.5;
+
+curveType = get(handles.curveSelect, 'Value');
+
+exps = get(handles.popup_experiments,'String');
+selectedExp= exps{get(handles.popup_experiments,'Value')};
+fp = getpref('nv','SavedExpDirectory');
+SavedExp = load(fullfile(fp,selectedExp));
+data = SavedExp.Scan;
+
+xData = linspace(data.vary_begin,data.vary_end,data.vary_points);
+
+twoCurves = get(handles.twoCurveCheck, 'Value');
+
+if twoCurves
+    yData = data.ExperimentData{1}{2}./data.ExperimentData{1}{1}; %normalize the two curves
+    
+    yDataOr = yData;
+    
+else
+    yData = data.ExperimentData{1}{1};
+end
+
+xData = linspace(1, 10, data.vary_points);
+
+yOffset = median(yData);
+yData = yData - median(yData);
+yAmplitude = max(abs(yData));
+ySign = sign(max(yData) + min(yData));
+
+sample = find(abs(yData) > threshold*yAmplitude);
+sampleStart = max(min(sample) - 5, 1);
+sampleEnd = min(max(sample) + 5, length(xData));
+
+yDataMod = yData(sampleStart:sampleEnd);
+xDataMod = xData(sampleStart:sampleEnd);
+
+hold(handles.axes_AvgData,'on');
+
+coeffs = handles.NVCCF.curvefit(xDataMod, yDataMod, curveType);
+
+yModel = handles.NVCCF.modelFunction(coeffs, xData, curveType);
+yModel = yModel + yOffset;
+xData = linspace(data.vary_begin,data.vary_end,data.vary_points);
+
+if twoCurves
+    figure(100);
+    hold on;
+    plot(xData, yDataOr, 'g-');
+    plot(xData, yModel, 'r-');
+    hold off;
+else
+    plot( handles.axes_AvgData, xData, yModel, 'r-');
+end
+
+hold(handles.axes_AvgData,'off');
+
+if curveType == 1 || curveType == 3
+    coeffsPr = [0 0 0];
+elseif curveType == 7 || curveType == 8
+    coeffsPr = [0 0 0 0 0 0];
+end
+
+
+if curveType == 1 || curveType == 3 || curveType == 7 || curveType == 8
+    coeffsPr(1) = ((coeffs(1) - 1)/9)*(data.vary_end - data.vary_begin) + data.vary_begin;
+    coeffsPr(2) = 9*coeffs(2)/(data.vary_end - data.vary_begin);
+    coeffsPr(3) = coeffs(3);
+    if curveType == 7 || curveType ==8
+        coeffsPr(4) = ((coeffs(4) - 1)/9)*(data.vary_end - data.vary_begin) + data.vary_begin;
+        coeffsPr(5) = 9*coeffs(5)/(data.vary_end - data.vary_begin);
+        coeffsPr(6) = coeffs(6);
+    end
+end
+
+set(handles.paramsOutput,'String',num2str(coeffsPr, '%10.3e, '));
+
+function paramsOutput_Callback(~, ~, ~)
+
+% --- Executes during object creation, after setting all properties.
+function paramsOutput_CreateFcn(hObject, ~, ~)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- Executes on button press in twoCurveCheck.
+function twoCurveCheck_Callback(~, ~, ~)
+
+%%%%% END EXPERIMENT PANEL %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%% From here down, not debugged %%%%%%%%%%%%% ONLY TRACKING %%%%%%%%%%%
+
+function popup_TrackFreq_Callback(~, ~, ~)
+
+function popup_TrackFreq_CreateFcn(hObject, ~, ~)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function edit_TrackThreshold_Callback(~, ~, ~)
+
+function edit_TrackThreshold_CreateFcn(hObject, ~, ~)
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- Executes on button press in toggle_TrackEnable.
+function toggle_TrackEnable_Callback(hObject, ~, handles)
+
+EnableTrack=get(hObject,'Value');
+if EnableTrack
+    set(handles.popup_TrackFreq,'Enable', 'on');
+    set(handles.edit_TrackThreshold,'Enable', 'on');
+else
+    set(handles.popup_TrackFreq,'Enable', 'off');
+    set(handles.edit_TrackThreshold,'Enable', 'off');
+end
+
+function toggle_TrackEnable_ButtonDownFcn(~, ~, ~)
