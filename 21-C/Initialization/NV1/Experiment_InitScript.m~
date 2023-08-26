@@ -1,0 +1,88 @@
+function [hObject,handles] = Experiment_InitScript(hObject,handles)
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% SETUP Signal Generator        %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% The signal generator, when it is on,  can also be accessed and controlled thru a web browser at the
+% following address: http://a-N5183A-40016
+
+if handles.Imaginghandles.QEGhandles.pulse_mode == 1 || handles.Imaginghandles.QEGhandles.pulse_mode == 0
+    
+    Timeout = 10;
+    InputBufferSize =  1000000;
+    OutputBufferSize = 1000000;
+    handles.ExperimentFunctions.interfaceSigGen = SignalGeneratorAgilent('a-N5183A-40016',5025,Timeout,InputBufferSize,OutputBufferSize);
+    handles..Timeout = Timeout;
+    handles.SignalGenerator.InputBufferSize = InputBufferSize;
+    handles.SignalGenerator.OutputBufferSize =  OutputBufferSize; 
+    handles.SignalGenerator.MinFreq = 100*1e3; %Hz
+    handles.SignalGenerator.MaxFreq = 20*1e9; %Hz
+    handles.SignalGenerator.MinAmp = -20; %dBm
+    handles.SignalGenerator.MaxAmp = 15; %dBm
+    
+    % apparently 5025 is the right port according to "Programming-mw-source-agilent.pdf"
+    % never use the IP to control the generator, as the DCHP makes the IP
+    % change constantly; rather use 'a-N5183A-40016'
+    
+    handles.SignalGenerator.reset();
+    
+else
+    
+    handles.SignalGenerator = SignalGeneratorAgilent_simu();
+    
+end
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% SETUP AWG                    %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if handles.Imaginghandles.QEGhandles.pulse_mode == 0
+    
+    %Setting levels of AWG markers
+    
+    handles.Imaginghandles.ImagingFunctions.interfacePulseGen.open();
+    %Switch: 1.5V
+    %(channel,1/2,low,high)
+    handles.Imaginghandles.ImagingFunctions.interfacePulseGen.setmarker(1,2,0,1.5);
+    
+    %SPD: 2V
+    %(channel,1/2,low,high)
+    handles.Imaginghandles.ImagingFunctions.interfacePulseGen.setmarker(2,1,0,2);
+    
+    handles.Imaginghandles.ImagingFunctions.interfacePulseGen.close();
+end
+
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  SETUP Data Acquisition Card (NI) for pulsed experiments %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+expCounter=handles.Imaginghandles.ImagingFunctions.interfaceDataAcq;
+
+% add Clock Line - This is the APD clock,
+% the "clock" telling when to acquire;
+% It is hooked up to ctr2 gate
+expCounter.addClockLine('Dev1/ctr2','/Dev1/PFI1');
+%clock line #3
+
+% add Clock Line - This is the APD clock,
+% the "clock" coming from the SignalGenerator Trig Out telling when to acquire;
+% It is hooked up to ctr3 gate
+expCounter.addClockLine('Dev1/ctr3','/Dev1/PFI6');
+%clock line #4
+
+handles.Counter = expCounter;
+
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% SETUP NVCommandCenterFunctions handles  %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%delay init and end seq
+handles.ExperimentFunctions.delay_init_and_end_seq = 1*1e-6; %s
+

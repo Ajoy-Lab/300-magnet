@@ -1,0 +1,176 @@
+function [hObject,handles] = Imaging_InitScript(hObject,handles)
+
+
+%% for: piezo offset, folder to save scan images, and preferred init script
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  SETUP Data Acquisition Card (NI)  %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if handles.QEGhandles.pulse_mode == 1 || handles.QEGhandles.pulse_mode == 0
+    
+    warning off MATLAB:loadlibrary:TypeNotFound
+    warning off MATLAB:loadlibrary:TypeNotFoundForStructure
+    %disables warning having to do with bugs in loadlibrary function
+    %http://www.mathworks.com/matlabcentral/answers/259-warnings-returned-by-loadlibrary
+    
+    % configure NIDAQ Instance
+    LibraryName = 'nidaqmx';
+    LibraryFilePath = 'nicaiu.dll';
+    HeaderFilePath = 'NIDAQmx.h';
+    handles.ImagingFunctions.interfaceDataAcq = DAQNI(LibraryName,LibraryFilePath,HeaderFilePath);
+    
+    handles.ImagingFunctions.interfaceDataAcq.SampleRate = 100*10e6; %100MHz is the sampling rate as specified for Pcie-6323
+    handles.ImagingFunctions.interfaceDataAcq.AnalogOutMinVoltage = -10;
+    handles.ImagingFunctions.interfaceDataAcq.AnalogOutMaxVoltage = 10;
+    handles.ImagingFunctions.interfaceDataAcq.TaskHandles = 0; 
+    handles.ImagingFunctions.interfaceDataAcq.hasAborted = 0;
+    handles.ImagingFunctions.interfaceDataAcq.ReadTimeout = 10;
+    handles.ImagingFunctions.interfaceDataAcq.WriteTimeout = 10;
+    handles.ImagingFunctions.interfaceDataAcq.ErrorStrings = {};
+    handles.ImagingFunctions.interfaceDataAcq.CounterOutSamples = 10000000000;
+    
+    % add Counter Line - coming from APD
+    % hooked up to ctr0 source
+    handles.ImagingFunctions.interfaceDataAcq.addCounterInLine('Dev1/ctr0','/Dev1/PFI8');
+    
+    % add Clock Line - This is the piezo sample clock,
+    % the "clock" coming from piezo in pixel clock
+    % hooked up to ctr0 gate
+    handles.ImagingFunctions.interfaceDataAcq.addClockLine('Dev1/ctr0','/Dev1/PFI9');
+    %clockline 1
+    
+    % for tracking/counting need one more clock,
+    % corresponding to out of ctr1
+    handles.ImagingFunctions.interfaceDataAcq.addClockLine('Dev1/ctr1','/Dev1/PFI13');
+    %clockline 2
+    
+    % +5V for the two SPD gates
+    handles.ImagingFunctions.interfaceDataAcq.addAOLine('/Dev1/ao0',5);
+    handles.ImagingFunctions.interfaceDataAcq.WriteAnalogOutLine(1);
+    
+    handles.ImagingFunctions.interfaceDataAcq.addAOLine('/Dev1/ao1',5);
+    handles.ImagingFunctions.interfaceDataAcq.WriteAnalogOutLine(2);
+    
+    handles.ImagingFunctions.interfaceDataAcq.addAILine('/Dev1/ai6');
+    %Analog Input line 1 to monitor photodiode
+    
+else
+    
+    handles.ImagingFunctions.interfaceDataAcq = DAQNI_simu();
+    
+end
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% SETUP Pulse Generator                %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if handles.QEGhandles.pulse_mode == 1
+    
+    LibraryName = 'spinapi';
+    LibraryFilePath = 'spinapi.dll';
+    HeaderFilePath = 'spinapi.h';
+    
+    handles.ImagingFunctions.interfacePulseGen = PulseGeneratorSpinCorePulseBlaster(LibraryFilePath,HeaderFilePath,LibraryName);
+    handles.ImagingFunctions.interfacePulseGen.PBInit();
+    handles.ImagingFunctions.interfacePulseGen.SampleRate = 500e6; %ClockRate of our pulse blaster is 500MHz
+    handles.ImagingFunctions.interfacePulseGen.SetClock(handles.PulseGenerator.SampleRate);
+     
+elseif handles.QEGhandles.pulse_mode == 0 %use AWG
+    
+    handles.ImagingFunctions.interfacePulseGen = ArbitraryWaveformGeneratorTektronix('Awg',1012); %port 1012 is the port that is "opened to connections" as chosen in the AWG software window
+    handles.ImagingFunctions.interfacePulseGen.open();
+    handles.ImagingFunctions.interfacePulseGen.SampleRate = 1.0e9; %Max SampleRate of our AWG is 1.2GS/s; using 1.0GS/s because it gives a time detail of exactly 1ns
+    handles.ImagingFunctions.interfacePulseGen.Set();
+    
+    handles.ImagingFunctions.interfacePulseGen.InputBufferSize = 1000000;
+    handles.ImagingFunctions.interfacePulseGen.OutputBufferSize = 1000000;
+    handles.ImagingFunctions.interfacePulseGen.Timeout = 60;
+    handles.ImagingFunctions.interfacePulseGen.Frequency = [0,0,0,0];
+    handles.ImagingFunctions.interfacePulseGen.Amplitude = [0,0,0,0]; 
+    handles.ImagingFunctions.interfacePulseGen.MinFreq = 0;
+    handles.ImagingFunctions.interfacePulseGen.interfacePulseGenhandles.PulseGenerator.MaxFreq = 250*1e6;
+    handles.ImagingFunctions.interfacePulseGen.MinAmp = -30; %or 20mVpp
+    handles.ImagingFunctions.interfacePulseGen.MaxAmp = 17;  %4.5Vpp
+    handles.ImagingFunctions.interfacePulseGen.MinSampleRate = 1e7; 
+    handles.ImagingFunctions.interfacePulseGen.MaxSampleRate = 1.2e9;
+    handles.ImagingFunctions.interfacePulseGen.max_number_of_reps = 65000; % Actually number of reps go from 1 to 65,536; to simplify, taken here max number of reps 65000
+    
+    %AOM: 2.7V max
+    %(channel,1/2,low,high)
+    handles.PulseGenerator.setmarker(1,1,0,2.7);  
+    handles.PulseGenerator.close();
+    
+elseif handles.QEGhandles.pulse_mode == 2 %simu PB
+    
+    handles.PulseGenerator = PulseGeneratorSpinCorePulseBlaster_simu();
+    
+elseif handles.QEGhandles.pulse_mode == 3 %simu AWG
+    
+    handles.PulseGenerator = ArbitraryWaveformGeneratorTektronix_simu();
+    
+end
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  SETUP Piezo (Mad City Labs) %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+if handles.QEGhandles.pulse_mode == 1 || handles.QEGhandles.pulse_mode == 0
+
+    LibraryName = 'Madlib';
+    LibraryFilePath = 'Madlib.dll';
+    HeaderFilePath = 'Madlib.h';
+    ADCtime = 5; %in ms
+    DAQtime = 1; %in ms
+    handles.ImagingFunctions.interfaceScanning = PiezoMadCityLabs(LibraryName,LibraryFilePath,HeaderFilePath,ADCtime,DAQtime);
+    handles.ImagingFunctions.interfaceScanning.ADCtime = ADCtime;
+    handles.ImagingFunctions.interfaceScanning.DAQtime = DAQtime;
+    handles.ImagingFunctions.interfaceScanning.HighEndOfRange = [200 200 200]; %in mum
+    handles.ImagingFunctions.interfaceScanning.LowEndOfRange = [0 0 0]; %in mum
+    handles.ImagingFunctions.interfaceScanning.StabilizeTime=0.05; %sec
+    handles.ImagingFunctions.interfaceScanning.nFlat = 100;           
+    handles.ImagingFunctions.interfaceScanning.nOverRun = 75;      
+    handles.ImagingFunctions.interfaceScanning.LagPts = 5; % PC
+    handles.ImagingFunctions.interfaceScanning.precision = [0.0001,0.0001,0.0001]; %in mum
+
+else
+    
+    handles.ImagingFunctions.interfaceScanning = PiezoMadCityLabs_simu();
+    
+end
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SETUP Tracking                %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+handles.ImagingFunctions.Tracker = Tracker();
+handles.ImagingFunctions.Tracker.DwellTime = 0.005;
+handles.ImagingFunctions.Tracker.DutyCycle = 0.5; % what is this duty cycle???
+handles.ImagingFunctions.Tracker.CounterInLine = 1; % corresponds to gate of crt0
+handles.ImagingFunctions.Tracker.CounterOutLine = 2; % corresponds to out of crt1
+handles.ImagingFunctions.Tracker.InitialStepSize = [0.05,0.05,0.05];
+handles.ImagingFunctions.Tracker.MinimumStepSize = [0.0005,0.0005,0.0005];
+handles.ImagingFunctions.Tracker.MaxIterations = 50;
+handles.ImagingFunctions.Tracker.TrackingThreshold = 0.01; %in kcps
+handles.ImagingFunctions.Tracker.StepReductionFactor  = [.5,.5,.5];
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SETUP Scans                          %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+handles.ImagingFunctions.ConfocalImages = ConfocalScan();
+handles.ImagingFunctions.CurrentScan = ConfocalScan();
+handles.ImagingFunctions.CurrentScan.DwellTime = 1/handles.ImagingFunctions.interfaceScanning.SampleRate;
+handles.ImagingFunctions.CurrentScan.MinValues = handles.ImagingFunctions.interfaceScanning.LowEndOfRange;
+handles.ImagingFunctions.CurrentScan.MaxValues = handles.ImagingFunctions.interfaceScanning.HighEndOfRange;
+handles.ImagingFunctions.CurrentScan.NumPoints = [100,100,100];
+handles.ImagingFunctions.CurrentScan.bEnable = [0,0,0];
+handles.ImagingFunctions.CurrentScan.Notes = 'Notes on Scan:';
+handles.ImagingFunctions.statuswb = 1;
+handles.ImagingFunctions.useFilter = 0;
+

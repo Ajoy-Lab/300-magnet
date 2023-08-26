@@ -1,0 +1,1269 @@
+classdef ImageAcquireFunctions < handle
+    
+    properties
+        interfaceDAQ
+        interfacePiezo
+        interfacePulseGen
+        CurrentScan
+        CurrentScanMat % For easier indexing, actually a cell structure
+        CounterRawData
+        ImageRawData
+        Image
+        TotalSamples
+        CursorPosition % position in X,Y,Z space of confocal spot
+        CurrentPosition
+        ConfocalImages = ConfocalImage();
+        ConfocalScans
+        statuswb = 1; %will be used as a handle to close the waitbar in case of stop scan
+        Tracker
+        power_data
+        cutoffVal %the value of the cutoff for the filter
+        useFilter = 0; %indicate if supposed to apply the filter
+    end
+    
+    events
+        
+        UpdateCursorPosition
+        UpdateCounterData
+        
+    end
+    
+    methods
+        
+        function [] = InitVarForScan(obj)
+            
+            % clear out the raw counter variables
+            obj.CounterRawData = [];
+            obj.ImageRawData = [];
+            
+            for k=1:3
+                obj.CurrentScanMat{k} = [];
+            end
+            
+        end
+        
+        function [] = SetCursor(obj)
+            
+            for k=1:3
+                obj.interfacePiezo.Mov(obj.CursorPosition(k),k);
+            end
+            
+            % notify listeners of the new position
+            notify(obj,'UpdateCursorPosition');
+        end
+        
+        function [] = QueryPos(obj)
+            obj.CursorPosition=[obj.interfacePiezo.Pos(1) obj.interfacePiezo.Pos(2) obj.interfacePiezo.Pos(3)];
+            notify(obj,'UpdateCursorPosition');
+        end
+        
+        function [] = SetScan(obj)
+            
+            scan = obj.CurrentScan;
+            for k=1:3
+                X = linspace(scan.MinValues(k),scan.MaxValues(k),scan.NumPoints(k));
+                obj.CurrentScanMat{k} = X;
+            end
+        end
+        
+        function [] = StartScan1D(obj,handles)
+            
+            obj.power_data = obj.interfaceDAQ.MonitorPower(handles,1);
+            
+            % loads scanning parameters from ConfocalScan object then
+            % prepares configuration of proper tasks for hardware interface
+            scan = obj.CurrentScan;
+           
+            ScanningHardware=obj.interfacePiezo;
+            nFlat=ScanningHardware.nFlat;
+            nOverRun=ScanningHardware.nOverRun;
+            % the LagPts are a property of the class PiezoMadCityLabs; they are
+            % extra points between the first nOverRun scan points and the scan
+            % range of interest
+            LagPts=ScanningHardware.LagPts; 
+            NVec=length(obj.CurrentScanMat{logical(scan.bEnable)});
+            Dwell = obj.ConfocalScans.DwellTime;
+            % In the original code, instead of the fc ceil, round was used. There was a
+            % problem since round could give a result of 0, and we're dividing by n
+            % further in the code
+            n = ceil(Dwell*ScanningHardware.SampRate);
+            %NT are the times during which counts are acquired
+            % in the original code, there was an extra -1 to NT that I erased to
+            % match the definition of nWaveform in PiezoMadCityLabs class
+            NT = (NVec)*2*n + nFlat + 2*nOverRun;
+            timeout = 10*NT/ScanningHardware.SampRate;
+            %prelocate memory for image
+            obj.Image = zeros(1,NVec);
+            % Clock line via DAQ that triggers the new counter buffer
+            TaskName = 'Counter';
+            obj.interfaceDAQ.CreateTask(TaskName);
+            obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+            obj.interfaceDAQ.StartTask(TaskName);
+            
+            Xinit=obj.interfacePiezo.Pos(1);
+            Yinit=obj.interfacePiezo.Pos(2);
+            Zinit=obj.interfacePiezo.Pos(3);
+            
+            set(findobj('Tag', 'text17'), 'String', 'NSQD line = ');
+            
+            
+            if scan.bEnable(1)
+                ScanningHardware.Scan(obj.CurrentScanMat{1},Yinit,Zinit,Dwell,1);
+            elseif scan.bEnable(2)
+                ScanningHardware.Scan(Xinit,obj.CurrentScanMat{2},Zinit,Dwell,2);
+            else %scan.bEnable(2)
+                ScanningHardware.Scan(Xinit,Yinit,obj.CurrentScanMat{3},Dwell,3);
+            end
+            
+            %compute normalized quadratic differences
+            b = obj.interfacePiezo.theorywaveform;
+            c = obj.interfacePiezo.realwaveform;
+            obj.ConfocalScans.Diffs = b - c; %array of differences theory - real
+            
+            % A is the raw data matrix
+            [A,status] = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout);
+            notify(obj,'UpdateCounterData');
+            % get back the info from the counter
+            obj.interfaceDAQ.StopTask(TaskName);
+            obj.ImageRawData=A;
+            % now we ignore all the nFlat, nOverRun, LagPts and take only the counts for the real
+            % points of interest + 1 before the scan range in order to take the
+            % count difference
+            %This is the new code
+            D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NVec)*2*n)); %vector that is NVec*2*n long
+            % D now needs to be transformed into a NVec long matrix
+            
+     
+            
+            obj.Image = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+            
+            
+            % the buffer count is cumulative; Ex: it reads [1 3 6 11], where the counts for our
+            % scan range of interest are 3, 6, 10. We need to make a vector "one
+            % position shorter" containing the amount of counts for that position
+            % only (ie, we need to take the difference). The function below takes
+            % [1 3 6 11] and returns [2 3 5], which are the real counts for the
+            % scan range of interest
+            
+            
+            
+            %Make piezo go back to point prior to beginning of scan if desired
+            if get(findobj('Tag', 'returninit'),'Value');
+                obj.interfacePiezo.Mov(Xinit,1);
+                obj.interfacePiezo.Mov(Yinit,2);
+                obj.interfacePiezo.Mov(Zinit,3);
+            end
+            
+            % Relase the DAQ counter task
+            obj.interfaceDAQ.ClearTask(TaskName);
+            
+            obj.power_data = obj.interfaceDAQ.MonitorPower(handles,0);
+            
+            load chirp;
+            sound(y,Fs);
+            
+        end
+        
+        function [] = StartScan2D(obj,handles)
+            
+            obj.power_data = obj.interfaceDAQ.MonitorPower(handles,1);
+            
+            scan = obj.CurrentScan;
+            for k=1:3
+                if scan.bEnable(k)
+                    L(k)=length(obj.CurrentScanMat{k});
+                else
+                    L(k)=0;
+                end
+            end
+            L=sort(L);
+            TotEstTime=(max(obj.interfacePiezo.ADCtime,obj.interfacePiezo.DAQtime)*L(3)*2e-3+1.2630+0.5+obj.interfacePiezo.StabilizeTime)*L(2);
+            wb = waitbar(0,['Progress of 2D Scan. Expected Scan Time: ',num2str(TotEstTime),'s']);
+            obj.statuswb = 1;
+            % PC Piezo stability
+            piezofigure=11;
+            figure(piezofigure);
+            
+            % follows StartScan1D order
+            
+            ScanningHardware=obj.interfacePiezo;
+            nFlat=ScanningHardware.nFlat;
+            nOverRun=ScanningHardware.nOverRun;
+            LagPts=ScanningHardware.LagPts;
+            Dwell = scan.DwellTime;
+            n = ceil(Dwell*ScanningHardware.SampRate);
+            TaskName='Counter';
+            
+            set(findobj('Tag', 'text17'), 'String', 'NSQD line = ');
+            
+            if scan.bEnable(1)*scan.bEnable(2) % XY scan
+                
+                Yinit=obj.interfacePiezo.Pos(2);
+                Y=obj.CurrentScanMat{2};
+                Zinit=obj.interfacePiezo.Pos(3);
+                Xinit=obj.interfacePiezo.Pos(1);
+                X=obj.CurrentScanMat{1};
+                NX=length(X);
+                NY=length(Y);
+                obj.ConfocalScans.Diffs = zeros(NY,NX);
+                
+                
+                
+                if NX >= NY %loop over Y
+                    % PC Piezo stability
+                    PiezoStabilityY=zeros(NY,1);
+                    PiezoStabilityZ=zeros(NY,1);
+                    PiezoStabilityX=zeros(NY,1);
+                    NT = (NX)*2*n + nFlat + 2*nOverRun;
+                    timeout = 10*NT/ScanningHardware.SampRate;
+                    %prelocate memory for image
+                    obj.Image = zeros(NY,NX);
+                    % Clock line via DAQ that triggers the new counter buffer - PC
+                    obj.interfaceDAQ.CreateTask(TaskName);
+                    obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                    
+                    for iy = 1:NY
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        if iy == 1
+                            ScanningHardware.Scan(X,Y(iy),Zinit,Dwell,1);
+                        else
+                            ScanningHardware.Trigg(X,Y(iy),Zinit,Dwell,1);
+                        end
+                        % PC Piezo stability
+                        PiezoStabilityY(iy)=100*(Y(iy)/ScanningHardware.Pos(2)-1);
+                        PiezoStabilityX(iy)=ScanningHardware.Pos(1);
+                        PiezoStabilityZ(iy)=100*(Zinit/ScanningHardware.Pos(3)-1);
+                        figure(piezofigure)
+                        subplot(3,1,1)
+                        plot(100*(PiezoStabilityX/mean(PiezoStabilityX)-1),'*:')
+                        title('% x deviation from the mean x value')
+                        axis tight
+                        subplot(3,1,2)
+                        plot(PiezoStabilityY,'*:')
+                        title('% y deviation')
+                        axis tight
+                        subplot(3,1,3)
+                        plot(PiezoStabilityZ,'*:')
+                        title('% z deviation')
+                        axis tight
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(iy,:) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = handles.axes1;
+                        imagesc(X,Y,obj.ConfocalScans.Diffs,'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'x (\mum)');
+                        ylabel(ax,'y (\mum)');
+                        set(ax, 'XLim',[min(X) max(X)], 'YLim', [min(Y) max(Y)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout);
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.CounterRawData=A;
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NX)*2*n)); %vector that is NX*2*n long
+                        % D now needs to be transformed into a NX long matrix
+                        
+                        
+                        obj.Image(iy,:) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        
+                        
+                        
+                        %plot temporarily
+                        imagesc(X,Y,obj.Image,'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'x (\mum)');
+                        ylabel(handles.imageAxes,'y (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(X) max(X)], 'YLim',[min(Y) max(Y)]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(iy/NY);
+                        else
+                            close(wb);
+                        end
+                        
+                        
+                        
+                    end
+                    
+                else %loop over X
+                    % PC Piezo stability
+                    PiezoStabilityY=zeros(NX,1);
+                    PiezoStabilityZ=zeros(NX,1);
+                    PiezoStabilityX=zeros(NX,1);
+                    NT = (NY)*2*n + nFlat + 2*nOverRun;
+                    timeout = 10*NT/ScanningHardware.SampRate;
+                    %prelocate memory for image
+                    obj.Image = zeros(NY,NX);
+                    % Clock line via DAQ that triggers the new counter buffer - PC
+                    obj.interfaceDAQ.CreateTask(TaskName);
+                    obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                    
+                    for ix = 1:NX
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        
+                        
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        if ix == 1
+                            ScanningHardware.Scan(X(ix),Y,Zinit,Dwell,2);
+                        else
+                            ScanningHardware.Trigg(X(ix),Y,Zinit,Dwell,2);
+                        end
+                        % PC Piezo stability
+                        PiezoStabilityX(ix)=100*(X(ix)/ScanningHardware.Pos(1)-1);
+                        PiezoStabilityY(ix)=ScanningHardware.Pos(2);
+                        PiezoStabilityZ(ix)=100*(Zinit/ScanningHardware.Pos(3)-1);
+                        figure(piezofigure)
+                        subplot(3,1,1)
+                        plot(PiezoStabilityX,'*:')
+                        title('% x deviation')
+                        axis tight
+                        subplot(3,1,2)
+                        plot(100*(PiezoStabilityY/mean(PiezoStabilityY)-1),'*:')
+                        axis tight
+                        title('% y deviation from the mean y value')
+                        subplot(3,1,3)
+                        plot(PiezoStabilityZ,'*:')
+                        axis tight
+                        title('% z deviation')
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(:,ix) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = findobj('Tag', 'axes1');
+                        imagesc(X,Y,obj.ConfocalScans.Diffs,'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'x (\mum)');
+                        ylabel(ax,'y (\mum)');
+                        set(ax, 'XLim',[min(X) max(X)], 'YLim', [min(Y) max(Y)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout);
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.CounterRawData=A;
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NY)*2*n)); %vector that is NY*2*n long
+                        % D now needs to be transformed into a NY long matrix
+                        
+                        obj.Image(:, ix) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        %plot temporarily
+                        imagesc(X,Y,obj.Image,'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'x (\mum)');
+                        ylabel(handles.imageAxes,'y (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(X) max(X)], 'YLim',[min(Y) max(Y)]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(ix/NX);
+                        else
+                            close(wb);
+                        end
+                        
+                        
+                    end
+                    
+                end
+                
+                obj.interfaceDAQ.ClearTask(TaskName);
+                
+                
+            elseif scan.bEnable(1)*scan.bEnable(3) % XZ scan
+                
+                Xinit=obj.interfacePiezo.Pos(1) ;
+                Yinit=obj.interfacePiezo.Pos(2) ;
+                Zinit=obj.interfacePiezo.Pos(3) ;
+                Z=obj.CurrentScanMat{3} ;
+                X=obj.CurrentScanMat{1} ;
+                NX=length(X);
+                NZ=length(Z);
+                obj.ConfocalScans.Diffs = zeros(NZ,NX);
+                
+                if NX >= NZ %loop over Z
+                    
+                    
+                    
+                    NT = (NX)*2*n + nFlat + 2*nOverRun;
+                    timeout = 10*NT/ScanningHardware.SampRate;
+                    %prelocate memory for image
+                    obj.Image = zeros(NZ,NX);
+                    % Clock line via DAQ that triggers the new counter buffer - PC
+                    obj.interfaceDAQ.CreateTask(TaskName);
+                    obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                    
+                    for iz = 1:NZ
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        if iz == 1
+                            ScanningHardware.Scan(X,Yinit,Z(iz),Dwell,1);
+                        else
+                            ScanningHardware.Trigg(X,Yinit,Z(iz),Dwell,1);
+                        end
+                        
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(iz,:) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = findobj('Tag', 'axes1');
+                        imagesc(X-handles.ConfocalScan.GlobalOffsetValues(1)*(ones(1,NX)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),obj.ConfocalScans.Diffs,'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'x (\mum)');
+                        ylabel(ax,'z (\mum)');
+                        set(ax, 'XLim',[min(X)-handles.ConfocalScan.GlobalOffsetValues(1) max(X)-handles.ConfocalScan.GlobalOffsetValues(1)], 'YLim', [min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout);
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.CounterRawData=A;
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NX)*2*n)); %vector that is NX*2*n long
+                        % D now needs to be transformed into a NX long matrix
+                        
+                        
+                        
+                        obj.Image(iz,:) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        
+                        
+                        %plot temporarily
+                        imagesc(X-handles.ConfocalScan.GlobalOffsetValues(1)*(ones(1,NX)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),obj.Image,'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'x (\mum)');
+                        ylabel(handles.imageAxes,'z (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(X)-handles.ConfocalScan.GlobalOffsetValues(1) max(X)-handles.ConfocalScan.GlobalOffsetValues(1)], 'YLim',[min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(iz/NZ);
+                        else
+                            close(wb);
+                        end
+                        
+                        
+                        
+                        
+                        
+                    end
+                    
+                else %loop over X
+                    
+                    
+                    NT = (NZ)*2*n + nFlat + 2*nOverRun;
+                    timeout = 10*NT/ScanningHardware.SampRate;
+                    %prelocate memory for image
+                    obj.Image = zeros(NZ,NX);
+                    % Clock line via DAQ that triggers the new counter buffer - PC
+                    obj.interfaceDAQ.CreateTask(TaskName);
+                    obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                    
+                    for ix = 1:NX
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        % if ~bGo, break; end
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        if ix == 1
+                            ScanningHardware.Scan(X(ix),Yinit,Z,Dwell,3);
+                        else
+                            ScanningHardware.Trigg(X(ix),Yinit,Z,Dwell,3);
+                        end
+                        
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(:,ix) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = findobj('Tag', 'axes1');
+                        imagesc(X-handles.ConfocalScan.GlobalOffsetValues(1)*(ones(1,NX)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),obj.ConfocalScans.Diffs,'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'x (\mum)');
+                        ylabel(ax,'z (\mum)');
+                        set(ax, 'XLim',[min(X)-handles.ConfocalScan.GlobalOffsetValues(1) max(X)-handles.ConfocalScan.GlobalOffsetValues(1)], 'YLim', [min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout);
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.CounterRawData=A;
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NZ)*2*n)); %vector that is NZ*2*n long
+                        % D now needs to be transformed into a NZ long matrix
+                        
+                        
+                        
+                        obj.Image(:, ix) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        
+                        
+                        %plot temporarily
+                        imagesc(X-handles.ConfocalScan.GlobalOffsetValues(1)*(ones(1,NX)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),obj.Image,'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'x (\mum)');
+                        ylabel(handles.imageAxes,'z (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(X)-handles.ConfocalScan.GlobalOffsetValues(1) max(X)-handles.ConfocalScan.GlobalOffsetValues(1)], 'YLim',[min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(ix/NX);
+                        else
+                            close(wb);
+                        end
+                        
+                        
+                        
+                        
+                        
+                    end
+                    
+                end
+                
+                obj.interfaceDAQ.ClearTask(TaskName);
+                
+                
+            else % YZ scan
+                
+                Yinit=obj.interfacePiezo.Pos(2);
+                Zinit=obj.interfacePiezo.Pos(3);
+                Y=obj.CurrentScanMat{2} ;
+                Z=obj.CurrentScanMat{3} ;
+                Xinit=obj.interfacePiezo.Pos(1);
+                NY=length(Y);
+                NZ=length(Z);
+                
+                obj.ConfocalScans.Diffs = zeros(NZ,NY);
+                if NY >= NZ %loop over Z
+                    
+                    
+                    NT = (NY)*2*n + nFlat + 2*nOverRun;
+                    timeout = 10*NT/ScanningHardware.SampRate;
+                    %prelocate memory for image
+                    obj.Image = zeros(NZ,NY);
+                    % Clock line via DAQ that triggers the new counter buffer - PC
+                    obj.interfaceDAQ.CreateTask(TaskName);
+                    obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                    
+                    for iz = 1:NZ
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        
+                        % if ~bGo, break; end
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        
+                        if iz == 1
+                            ScanningHardware.Scan(Xinit,Y,Z(iz),Dwell,2);
+                        else
+                            ScanningHardware.Trigg(Xinit,Y,Z(iz),Dwell,2);
+                        end
+                        
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(iz,:) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = findobj('Tag', 'axes1');
+                        imagesc(Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),obj.ConfocalScans.Diffs,'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'y (\mum)');
+                        ylabel(ax,'z (\mum)');
+                        set(ax, 'XLim',[min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)], 'YLim', [min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout);
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.CounterRawData=A;
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NY)*2*n)); %vector that is NVec*2*n long
+                        % D now needs to be transformed into a NVec long matrix
+                        
+                        obj.Image(iz,:) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        
+                        %plot temporarily
+                        imagesc(Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),obj.Image,'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'y (\mum)');
+                        ylabel(handles.imageAxes,'z (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)], 'YLim',[min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(iz/NZ);
+                        else
+                            close(wb);
+                        end
+                        
+                        
+                        
+                        
+                        
+                    end
+                    
+                else %loop over Y
+                    
+                    
+                    
+                    NT = (NZ)*2*n + nFlat + 2*nOverRun;
+                    timeout = 10*NT/ScanningHardware.SampRate;
+                    %prelocate memory for image
+                    obj.Image = zeros(NZ,NY);
+                    % Clock line via DAQ that triggers the new counter buffer - PC
+                    obj.interfaceDAQ.CreateTask(TaskName);
+                    obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                    
+                    for iy = 1:NY
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        % if ~bGo, break; end
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        
+                        if iy == 1
+                            ScanningHardware.Scan(Xinit,Y(iy),Z,Dwell,3);
+                        else
+                            ScanningHardware.Trigg(Xinit,Y(iy),Z,Dwell,3);
+                        end
+                        
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(:,iy) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = findobj('Tag', 'axes1');
+                        imagesc(Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),obj.ConfocalScans.Diffs,'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'y (\mum)');
+                        ylabel(ax,'z (\mum)');
+                        set(ax, 'XLim',[min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)], 'YLim', [min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout) ;
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.CounterRawData=A;
+                        
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NZ)*2*n)); %vector that is NZ*2*n long
+                        % D now needs to be transformed into a NZ long matrix
+                        
+                        
+                        
+                        
+                        obj.Image(:, iy) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        
+                        %plot temporarily
+                        imagesc(Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),obj.Image,'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'y (\mum)');
+                        ylabel(handles.imageAxes,'z (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)], 'YLim',[min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(iy/NY);
+                        else
+                            close(wb);
+                        end
+                        
+                    end
+                    
+                end
+                
+                obj.interfaceDAQ.ClearTask(TaskName);
+                
+            end
+            
+            if get(findobj('Tag', 'returninit'),'Value');
+                obj.interfacePiezo.Mov(Xinit,1);
+                obj.interfacePiezo.Mov(Yinit,2);
+                obj.interfacePiezo.Mov(Zinit,3);
+            end
+            
+            if obj.statuswb
+                close(wb);
+            end
+            
+            obj.power_data = obj.interfaceDAQ.MonitorPower(handles,0);
+            
+            load chirp;
+            sound(y,Fs);
+            
+            
+        end
+        
+        function [] = StartScan3D(obj, handles)
+            
+            obj.power_data = obj.interfaceDAQ.MonitorPower(handles,1);
+            
+            scan = obj.CurrentScan;
+            for k=1:3
+                L(k)=length(obj.CurrentScanMat{k});
+            end
+            L=sort(L);
+            TotEstTime=(max(obj.interfacePiezo.ADCtime,obj.interfacePiezo.DAQtime)*L(3)*2e-3+1.2630+0.5+obj.interfacePiezo.StabilizeTime)*L(2)*L(1);
+            wb = waitbar(0,['Progress of 3D Scan. Expected Scan Time: ',num2str(TotEstTime),'s']);
+            obj.statuswb = 1;
+            
+            ScanningHardware=obj.interfacePiezo;
+            nFlat=ScanningHardware.nFlat;
+            nOverRun=ScanningHardware.nOverRun;
+            LagPts=ScanningHardware.LagPts;
+            %obj.interfaceDAQ.ClearAllTasks;
+            TaskName='Counter';
+            Dwell = scan.DwellTime;
+            n = ceil(Dwell*ScanningHardware.SampRate);
+            Xinit=obj.interfacePiezo.Pos(1);
+            Yinit=obj.interfacePiezo.Pos(2);
+            Zinit=obj.interfacePiezo.Pos(3);
+            Y=obj.CurrentScanMat{2} ;
+            Z=obj.CurrentScanMat{3} ;
+            X=obj.CurrentScanMat{1} ;
+            NX=length(X);
+            NY=length(Y);
+            NZ=length(Z);
+            obj.ConfocalScans.Diffs = zeros(NY,NX,NZ);
+            
+            set(findobj('Tag', 'text17'), 'String', 'NSQD line = ');
+            
+            if NX >= NY && NX >= NZ %loop over YZ
+                
+                
+                NT = (NX)*2*n + nFlat + 2*nOverRun;
+                timeout = 10*NT/ScanningHardware.SampRate;
+                %prelocate memory for image
+                obj.Image = zeros(NZ,NY,NX);
+                % Clock line via DAQ that triggers the new counter buffer - PC
+                obj.interfaceDAQ.CreateTask(TaskName);
+                obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                
+                
+                aux_nb = 1;
+                
+                for iz=1:NZ
+                    
+                    
+                    for iy = 1:NY
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        if iy == 1
+                            ScanningHardware.Scan(X,Y(iy),Z(iz),Dwell,1);
+                        else
+                            ScanningHardware.Trigg(X,Y(iy),Z(iz),Dwell,1);
+                        end
+                        
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(iy,:,iz) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = findobj('Tag', 'axes1');
+                        
+                        imagesc(X-handles.ConfocalScan.GlobalOffsetValues(1)*(ones(1,NX)),Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),obj.ConfocalScans.Diffs(:,:,iz),'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'x (\mum)');
+                        ylabel(ax,'y (\mum)');
+                        set(ax, 'XLim',[min(X)-handles.ConfocalScan.GlobalOffsetValues(1) max(X)-handles.ConfocalScan.GlobalOffsetValues(1)], 'YLim', [min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout) ;
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.ImageRawData = A;
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NX)*2*n)); %vector that is NVec*2*n long
+                        % D now needs to be transformed into a NVec long matrix
+                        
+                        obj.Image(iz, iy, :) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        
+                        %plot temporarily
+                        tmpimg = obj.UnpackImage();
+                        imagesc(X-handles.ConfocalScan.GlobalOffsetValues(1)*(ones(1,NX)),Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),tmpimg(:,:,iz),'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'x (\mum)');
+                        ylabel(handles.imageAxes,'y (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(X)-handles.ConfocalScan.GlobalOffsetValues(1) max(X)-handles.ConfocalScan.GlobalOffsetValues(1)], 'YLim',[min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)]);
+                        %      set(handles.imageAxes, 'CLim', [min(obj.Image(:)) max(obj.Image(:))]);
+                        set(handles.text6, 'Visible', 'on');
+                        set(handles.text6,'String', ['Z pos = ' num2str(Z(iz) - handles.ConfocalScan.GlobalOffsetValues(3))]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(aux_nb/(NY*NZ));
+                        else
+                            close(wb);
+                        end
+                        aux_nb = aux_nb + 1;
+                        
+                        
+                        
+                        
+                        
+                    end
+                    
+                    
+                    
+                end
+                
+            elseif NY >= NX && NY >= NZ %loop over XZ
+                
+                
+                %if ~bGo, break; end
+                NT = (NY)*2*n + nFlat + 2*nOverRun;
+                timeout = 10*NT/ScanningHardware.SampRate;
+                %prelocate memory for image
+                obj.Image = zeros(NZ,NY,NX);
+                % Clock line via DAQ that triggers the new counter buffer - PC
+                obj.interfaceDAQ.CreateTask(TaskName);
+                obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                
+                aux_nb = 1;
+                
+                for iz=1:NZ
+                    
+                    
+                    for ix = 1:NX
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        % if ~bGo, break; end
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        if ix == 1
+                            ScanningHardware.Scan(X(ix),Y,Z(iz),Dwell,2);
+                        else
+                            ScanningHardware.Trigg(X(ix),Y,Z(iz),Dwell,2);
+                        end
+                        
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(:,ix,iz) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = findobj('Tag', 'axes1');
+                        
+                        imagesc(X-handles.ConfocalScan.GlobalOffsetValues(1)*(ones(1,NX)),Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),obj.ConfocalScans.Diffs(:,:,iz),'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'x (\mum)');
+                        ylabel(ax,'y (\mum)');
+                        set(ax, 'XLim',[min(X)-handles.ConfocalScan.GlobalOffsetValues(1) max(X)-handles.ConfocalScan.GlobalOffsetValues(1)], 'YLim', [min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout) ;
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.ImageRawData = A;
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NY)*2*n)); %vector that is NY*2*n long
+                        % D now needs to be transformed into a NY long matrix
+                        
+                        obj.Image(iz,:,ix) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        
+                        tmpimg = obj.UnpackImage();
+                        imagesc(X-handles.ConfocalScan.GlobalOffsetValues(1)*(ones(1,NX)),Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),tmpimg(:,:,iz),'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'x (\mum)');
+                        ylabel(handles.imageAxes,'y (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(X)-handles.ConfocalScan.GlobalOffsetValues(1) max(X)-handles.ConfocalScan.GlobalOffsetValues(1)], 'YLim',[min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)]);
+                        set(handles.imageAxes, 'CLim', [min(obj.Image(:)) max(obj.Image(:))]);
+                        set(handles.text6, 'Visible', 'on');
+                        set(handles.text6,'String', ['Z pos = ' num2str(Z(iz) - handles.ConfocalScan.GlobalOffsetValues(3))]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(aux_nb/(NX*NZ));
+                        else
+                            close(wb);
+                        end
+                        aux_nb = aux_nb + 1;
+                        
+                        
+                        
+                        
+                    end
+                    
+                    
+                    
+                end
+                
+            else % loop over XY
+                
+                
+                %if ~bGo, break; end
+                NT = (NZ)*2*n + nFlat + 2*nOverRun;
+                timeout = 10*NT/ScanningHardware.SampRate;
+                %prelocate memory for image
+                obj.Image = zeros(NZ,NY,NX);
+                % Clock line via DAQ that triggers the new counter buffer - PC
+                obj.interfaceDAQ.CreateTask(TaskName);
+                obj.interfaceDAQ.ConfigureCounterIn(TaskName,1,1,NT); %NT+1?
+                
+                aux_nb = 1;
+                
+                for ix=1:NX
+                    
+                    
+                    for iy = 1:NY
+                        
+                        if ~obj.statuswb
+                            break;
+                        end
+                        % if ~bGo, break; end
+                        obj.interfaceDAQ.StartTask(TaskName);
+                        
+                        if iy == 1
+                            ScanningHardware.Scan(X(ix),Y(iy),Z,Dwell,3);
+                        else
+                            ScanningHardware.Trigg(X(ix),Y(iy),Z,Dwell,3);
+                        end
+                        
+                        
+                        %compute normalized quadratic differences
+                        b = obj.interfacePiezo.theorywaveform;
+                        c = obj.interfacePiezo.realwaveform;
+                        d = sum((b - c).^2)/length(b);
+                        obj.ConfocalScans.Diffs(iy,ix,:) = b - c; %array of differences theory - real
+                        
+                        
+                        set(findobj('Tag', 'number'),'String',d);
+                        ax = findobj('Tag', 'axes1');
+                        
+                        imagesc(Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),reshape(obj.ConfocalScans.Diffs(:,ix,:),NY,NZ),'Parent',ax);
+                        set(ax,'YDir','normal');
+                        axis(ax,'square');
+                        title(ax, 'Last Started Scan');
+                        xlabel(ax,'y (\mum)');
+                        ylabel(ax,'z (\mum)');
+                        set(ax, 'XLim',[min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)], 'YLim', [min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        h = colorbar('peer', ax,'EastOutside');
+                        set(get(h,'ylabel'),'String','Diff (theo - real)(\mum)');
+                        drawnow();
+                        set(ax,'Tag','axes1');
+                        
+                        A = obj.interfaceDAQ.ReadCounterBuffer(TaskName,NT,timeout) ;
+                        notify(obj,'UpdateCounterData');
+                        obj.interfaceDAQ.StopTask(TaskName);
+                        obj.ImageRawData = A;
+                        
+                        %This is the new code
+                        D = A((nFlat+nOverRun+LagPts+1):(nFlat+nOverRun+LagPts+(NZ)*2*n)); %vector that is NZ*2*n long
+                        % D now needs to be transformed into a NVec long matrix
+                        
+                        
+                        obj.Image(:,iy,ix) = obj.calc_countrate(D, n, ScanningHardware.SampRate);
+                        
+                        
+                        tmpimg = obj.UnpackImage();
+                        imagesc(Y-handles.ConfocalScan.GlobalOffsetValues(2)*(ones(1,NY)),Z-handles.ConfocalScan.GlobalOffsetValues(3)*(ones(1,NZ)),reshape(tmpimg(:,ix,:), NY,NZ),'Parent',handles.imageAxes);
+                        set(handles.imageAxes,'YDir','normal');
+                        axis(handles.imageAxes,'square');
+                        xlabel(handles.imageAxes,'y (\mum)');
+                        ylabel(handles.imageAxes,'z (\mum)');
+                        set(handles.imageAxes, 'XLim',[min(Y)-handles.ConfocalScan.GlobalOffsetValues(2) max(Y)-handles.ConfocalScan.GlobalOffsetValues(2)], 'YLim',[min(Z)-handles.ConfocalScan.GlobalOffsetValues(3) max(Z)-handles.ConfocalScan.GlobalOffsetValues(3)]);
+                        set(handles.imageAxes, 'CLim', [min(obj.Image(:)) max(obj.Image(:))]);
+                        set(handles.text6, 'Visible', 'on');
+                        set(handles.text6,'String', ['X pos = ' num2str(X(ix) - handles.ConfocalScan.GlobalOffsetValues(1))]);
+                        h = colorbar('peer', handles.imageAxes,'EastOutside');
+                        set(get(h,'ylabel'),'String','kcps');
+                        drawnow();
+                        
+                        if obj.statuswb
+                            waitbar(aux_nb/(NY*NX));
+                        else
+                            close(wb);
+                        end
+                        aux_nb = aux_nb + 1;
+                        
+                        
+                        
+                        
+                    end
+                    
+                    
+                    
+                end
+                
+            end
+            
+            obj.interfaceDAQ.ClearTask(TaskName);
+            
+            if get(findobj('Tag', 'returninit'),'Value');
+                obj.interfacePiezo.Mov(Xinit,1);
+                obj.interfacePiezo.Mov(Yinit,2);
+                obj.interfacePiezo.Mov(Zinit,3);
+            end
+            
+            if obj.statuswb
+                close(wb);
+            end
+            
+            obj.power_data = obj.interfaceDAQ.MonitorPower(handles,0);
+            
+            load chirp;
+            sound(y,Fs);
+        end
+        
+        % Clear the scan object
+        function [] = ClearScan(obj)
+            obj.interfaceDAQ.ClearTask('Counter');
+            
+        end
+        
+        % Functions for Image processing
+        function [] = StoreConfocalImage(obj)
+            
+            
+            a = length(obj.ConfocalImages);
+            
+            isFirst = length(obj.ConfocalImages(1).ImageData);
+            
+            
+            
+            cImage = ConfocalImage();
+            if size(obj.Image,1) > 1
+                cImage.ImageData = obj.UnpackImage();
+            else
+                cImage.ImageData = obj.Image;
+            end
+            
+            cImage.ScanData = obj.CurrentScan.ExportScan();
+            
+            
+            if obj.CurrentScan.bEnable(3)
+                cImage.RangeZ = obj.CurrentScanMat{3} - ones(1,length(obj.CurrentScanMat{3}))*(obj.ConfocalScans.GlobalOffsetValues(3));
+            else
+                cImage.RangeZ = obj.interfacePiezo.Pos(3);
+            end
+            
+            if obj.CurrentScan.bEnable(2)
+                cImage.RangeY = obj.CurrentScanMat{2} - ones(1,length(obj.CurrentScanMat{2}))*(obj.ConfocalScans.GlobalOffsetValues(2));
+            else
+                cImage.RangeY = obj.interfacePiezo.Pos(2);
+            end
+            
+            if obj.CurrentScan.bEnable(1)
+                cImage.RangeX = obj.CurrentScanMat{1}- ones(1,length(obj.CurrentScanMat{1}))*(obj.ConfocalScans.GlobalOffsetValues(1));
+            else
+                cImage.RangeX = obj.interfacePiezo.Pos(1);
+            end
+            
+            
+            cImage.Diffs = obj.ConfocalScans.Diffs;
+            cImage.GlobalOffsetValues = obj.ConfocalScans.GlobalOffsetValues;
+            cImage.Notes = obj.ConfocalScans.Notes;
+            cImage.DwellTime = obj.ConfocalScans.DwellTime;
+            cImage.Laserpower = obj.power_data;
+            
+            
+            % finally, copy the cImage to the object
+            if isFirst == 0,
+                obj.ConfocalImages = cImage;
+            else
+                obj.ConfocalImages(a+1) = cImage;
+            end
+        end
+        
+        function [img] = UnpackImage(obj)
+            dimX = obj.CurrentScan.NumPoints(1);
+            dimY = obj.CurrentScan.NumPoints(2);
+            dimZ = obj.CurrentScan.NumPoints(3);
+            
+            if obj.CurrentScan.bEnable(1)*obj.CurrentScan.bEnable(2)*obj.CurrentScan.bEnable(3) %3d scan
+                
+                img = zeros(dimY,dimX,dimZ);
+                
+                %New code. CDA
+                for a=1:1:dimX
+                    for b=1:1:dimY
+                        for c=1:1:dimZ
+                            img(b,a,c) = obj.Image(c,b,a);
+                        end
+                    end
+                end
+                
+                
+            else % 2d scan
+                
+                
+                
+                img = obj.Image;
+                
+            end
+            
+        end
+        
+        function [hObject,handles] = TrackingInit(hObject,handles)
+            
+            handles.listeners.counts = addlistener(handles.Tracker,'TrackerCountsUpdated',@(src,eventdata)Tracker.plotNNCounts(handles,eventdata));
+            handles.listeners.step = addlistener(handles.Tracker,'StepSizeReduced',@(src,eventdata)Tracker.updateStepSize(handles,eventdata));
+            handles.listeners.position = addlistener(handles.Tracker,'PositionUpdated',@(src,eventdata)Tracker.updatePosition(handles,eventdata));
+            
+        end
+        
+    end
+    
+    methods (Static)
+        
+        function result = calc_countrate(D, n, rate)
+            % calculates the count rate from the raw data (= APD buffer readout)
+            % i.e. buffer[k+1] - buffer[k] = countrate[k]
+            
+            aux1=D(1:2:end);
+            aux2=D(2:2:end);
+            hlp=double(aux2-aux1);
+            
+            if n>1
+                E = [];
+                for k = 1:1:n
+                    E = [E.' double(D(k:n:end)).'].';
+                end;
+                E = mean(E)/1000;%transform to have kcps
+            else
+                E = hlp/1000;%transform to have kcps
+            end;
+            
+            result = E*rate;
+        end
+        
+    end
+    
+end

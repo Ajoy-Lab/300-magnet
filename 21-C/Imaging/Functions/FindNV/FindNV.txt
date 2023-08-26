@@ -1,0 +1,5 @@
+Implemented by Jon Schneider
+
+FindNV is the GUI that is opened upon pressing the button "Find NV" in the Imaging GUI.
+
+It helps scanning for NVs. 

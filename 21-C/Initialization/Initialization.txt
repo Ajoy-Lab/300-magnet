@@ -1,0 +1,7 @@
+Initialization Folder
+
+There should be one folder for each experimental setup. Each folder should contain 2 files named
+exactly Imaging_InitScript.m and Experiment_InitScript.m .
+
+The preference as to which folder should be used for each experimental setup is set along with the other preferences when the QEG GUI is
+launched.

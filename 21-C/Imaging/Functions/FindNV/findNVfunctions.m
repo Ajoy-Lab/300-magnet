@@ -1,0 +1,407 @@
+classdef findNVfunctions < handle
+   
+    properties
+        scanInfo    %the component info for the current scan
+        
+        %scan x-data
+        xMin        %min x coord of scan
+        xMax        %max x coord of scan
+        xPts        %number of x points in scan
+        
+        yMin
+        yMax
+        yPts
+        
+        zMin
+        zMax
+        zPts
+        
+        pixelVolume %the volume(/area) of one pixel in absolute units (mum^3 or mum^2)
+        
+        curIndex    %the index of the current selected component
+        compSet     %the set of indices of the current selected components
+        
+        is2D        %is the current scan a 2D scan?
+        constDim    %if so, which dimension is not scanned (x = 1, y = 2, z = 3)
+    end % properties
+    
+    events
+        % events
+    end
+    
+    methods
+        
+
+        function b = isValid(obj, x, y, z, dims)
+            b = (x>0 & x<=dims(1) & y>0 & y<=dims(2) & z > 0 & z<=dims(3));
+
+        end
+        
+        function b = isValid2D(obj, x, y, dims)
+            b = (x>0 & x<=dims(1) & y>0 & y<=dims(2));
+        end
+
+        function sM = smoothM(obj, M)
+
+            dims = size(M);
+            xDisp = [0 -1 1 0 0 0 0];
+            yDisp = [0 0 0 -1 1 0 0];
+            zDisp = [0 0 0 0 0 -1 1];
+            nDisp = numel(xDisp);
+
+            sM = zeros(dims);
+
+            for x = 1:dims(1)
+                for y = 1:dims(2)
+                    for z = 1:dims(3)
+                        dataSum = 0;
+                        nPoints = 0;
+                        for i = 1:nDisp
+                           curX = x + xDisp(i);
+                           curY = y + yDisp(i);
+                           curZ = z + zDisp(i);
+                           if obj.isValid(curX, curY, curZ, dims)
+                               dataSum = dataSum + M(curX,curY,curZ);
+                               nPoints = nPoints + 1;
+                           end
+                        end
+
+                        sM(x,y,z) = dataSum/nPoints;
+
+                    end
+                end
+            end
+
+        end
+        
+        function sM = smoothM2D(obj, M)
+
+            dims = size(M);
+            xDisp = [0 -1 1 0 0];
+            yDisp = [0 0 0 -1 1];
+            nDisp = numel(xDisp);
+
+            sM = zeros(dims);
+
+            for x = 1:dims(1)
+                for y = 1:dims(2)
+                    dataSum = 0;
+                    nPoints = 0;
+                    for i = 1:nDisp
+                       curX = x + xDisp(i);
+                       curY = y + yDisp(i);
+                       if obj.isValid2D(curX, curY, dims)
+                           dataSum = dataSum + M(curX,curY);
+                           nPoints = nPoints + 1;
+                       end
+                    end
+
+                    sM(x,y) = dataSum/nPoints;
+                end
+            end
+
+        end
+
+        function bM = toBinData(obj, M, cutoffMin, cutoffMax)
+
+            dataMin = min(min(min(M)));
+            dataMax = max(max(max(M)));
+            dataCutMin = cutoffMin*dataMax + (1-cutoffMin)*dataMin;
+            dataCutMax = cutoffMax*dataMax + (1-cutoffMax)*dataMin;
+            
+            bM = (M>=dataCutMin & M<=dataCutMax);
+
+        end
+        
+        function bM = toBinData2D(obj, M, cutoffMin, cutoffMax)
+
+            dataMin = min(min(min(M)));
+            dataMax = max(max(max(M)));
+            dataCutMin = cutoffMin*dataMax + (1-cutoffMin)*dataMin;
+            dataCutMax = cutoffMax*dataMax + (1-cutoffMax)*dataMin;
+            
+            bM = (M>=dataCutMin & M<=dataCutMax);
+
+        end
+
+
+        function iM = toComponents(obj, bM)
+
+            nLabel = 0;
+
+            iM = -bM;
+
+            dims = size(bM);
+
+            xDisp = [ -1 1 0 0 0 0];
+            yDisp = [ 0 0 -1 1 0 0];
+            zDisp = [ 0 0 0 0 -1 1];
+            nDisp = numel(xDisp);
+
+            for x = 1:dims(1)
+                for y = 1:dims(2)
+                    for z = 1:dims(3)
+                        if iM(x,y,z)==-1
+                           nLabel = nLabel+1;
+
+                           qX = x;
+                           qY = y;
+                           qZ = z;
+
+                           iM(x,y,z) = nLabel;
+
+                           while ~isempty(qX)
+
+
+                               curX = qX(1);
+                               curY = qY(1);
+                               curZ = qZ(1);
+
+                               qX = qX(2:end);
+                               qY = qY(2:end);
+                               qZ = qZ(2:end);
+
+                               for i = 1:nDisp
+                                  nextX = curX + xDisp(i);
+                                  nextY = curY + yDisp(i);
+                                  nextZ = curZ + zDisp(i);
+
+                                  if obj.isValid(nextX, nextY, nextZ, dims)
+                                     if iM(nextX,nextY,nextZ)==-1
+                                         iM(nextX,nextY,nextZ) = nLabel;
+                                         qX = [qX, nextX];
+                                         qY = [qY, nextY];
+                                         qZ = [qZ, nextZ];
+                                     end
+                                  end
+                               end
+                           end
+                        end
+                    end
+                end
+            end
+
+        end
+        
+       function iM = toComponents2D(obj, bM)
+
+            nLabel = 0;
+
+            iM = -bM;
+
+            dims = size(bM);
+
+            xDisp = [ -1 1 0 0];
+            yDisp = [ 0 0 -1 1];
+            nDisp = numel(xDisp);
+
+            for x = 1:dims(1)
+                for y = 1:dims(2)
+                    if iM(x,y)==-1
+                       nLabel = nLabel+1;
+
+                       qX = x;
+                       qY = y;
+
+                       iM(x,y) = nLabel;
+
+                       while ~isempty(qX)
+
+
+                           curX = qX(1);
+                           curY = qY(1);
+
+                           qX = qX(2:end);
+                           qY = qY(2:end);
+
+                           for i = 1:nDisp
+                              nextX = curX + xDisp(i);
+                              nextY = curY + yDisp(i);
+
+                              if obj.isValid2D(nextX, nextY, dims)
+                                 if iM(nextX,nextY)==-1
+                                     iM(nextX,nextY) = nLabel;
+                                     qX = [qX, nextX];
+                                     qY = [qY, nextY];
+                                 end
+                              end
+                           end
+                       end
+                    end
+                end
+            end
+
+        end
+
+        function cInfo = getComponentInfo(obj, iM, M)
+
+            n = max(max(max(iM)));
+
+            cInfo = [1:n; zeros(1,n); zeros(1,n); zeros(1,n); zeros(1,n); zeros(1,n);  zeros(1,n); zeros(1,n); zeros(1,n);  zeros(1,n); zeros(1,n); zeros(1,n); zeros(1, n)];
+
+            %cInfo(1,i) = label of component
+            %cInfo(2,i) = number of pixels in component
+            %cInfo(3,i) = average brightness of component
+            %cInfo(4,i) = x-coordinate of center of component
+            %cInfo(5,i) = y-coordinate of center of component
+            %cInfo(6,i) = z-coordinate of center of component
+            %cInfo(7,i) = weighted x-coordinate of center of component
+            %cInfo(8,i) = weighted y-coordinate of center of component
+            %cInfo(9,i) = weighted z-coordinate of center of component
+            %cInfo(10, i) = std. dev. of x-coordinate of component
+            %cInfo(11, i) = std. dev. of y-coordinate of component
+            %cInfo(12, i) = std. dev. of z-coordinate of component
+            %cInfo(13, i) = sphere-ness of component
+
+            dims = size(M);
+
+            for y = 1:dims(1)
+                for x = 1:dims(2)
+                    for z = 1:dims(3)
+                        if iM(y,x,z)>0
+                            ind = iM(y,x,z);
+                            cInfo(2,ind) = cInfo(2,ind)+1;
+                            cInfo(3,ind) = cInfo(3,ind)+M(y,x,z);
+                            cInfo(4,ind) = cInfo(4,ind)+ x;
+                            cInfo(5,ind) = cInfo(5,ind)+ y;
+                            cInfo(6,ind) = cInfo(6,ind)+ z;
+                            cInfo(7,ind) = cInfo(7,ind)+ x*M(y,x,z);
+                            cInfo(8,ind) = cInfo(8,ind)+ y*M(y,x,z);
+                            cInfo(9,ind) = cInfo(9,ind)+ z*M(y,x,z);
+                        end
+
+                    end
+                end
+            end
+            
+            for i=1:n
+                cInfo(4,i) = cInfo(4,i)/cInfo(2,i);
+                cInfo(5,i) = cInfo(5,i)/cInfo(2,i);
+                cInfo(6,i) = cInfo(6,i)/cInfo(2,i);
+                cInfo(7,i) = cInfo(7,i)/cInfo(3,i);
+                cInfo(8,i) = cInfo(8,i)/cInfo(3,i);
+                cInfo(9,i) = cInfo(9,i)/cInfo(3,i);
+                cInfo(3,i) = cInfo(3,i)/cInfo(2,i);
+            end
+
+            
+            for y = 1:dims(1)
+                for x = 1:dims(2)
+                    for z = 1:dims(3)
+                        if iM(y,x,z)>0
+                            ind = iM(y,x,z);
+                            cInfo(10, ind) = cInfo(10, ind) + (x - cInfo(4,ind))^2;
+                            cInfo(11, ind) = cInfo(11, ind) + (y - cInfo(5,ind))^2;
+                            cInfo(12, ind) = cInfo(12, ind) + (z - cInfo(6,ind))^2;
+                        end
+
+                    end
+                end
+            end
+
+            for i=1:n
+                cInfo(10, i) = sqrt(cInfo(10, i)/cInfo(2,i));
+                cInfo(11, i) = sqrt(cInfo(11, i)/cInfo(2,i));
+                cInfo(12, i) = sqrt(cInfo(12, i)/cInfo(2,i));
+                cInfo(13, i) = (cInfo(10,i)^2 + cInfo(11, i)^2 + cInfo(12, i)^2)/((cInfo(2,i))^(2/3));
+            end
+
+            [~, index] = sort(cInfo(2, :),'descend');
+            cInfo = cInfo(:, index);
+
+        end
+        
+        function cInfo = getComponentInfo2D(obj, iM, M)
+
+            n = max(max(max(iM)));
+
+            cInfo = [1:n; zeros(1,n); zeros(1,n); zeros(1,n); zeros(1,n); zeros(1,n);  zeros(1,n); zeros(1,n); zeros(1,n);  zeros(1,n); zeros(1,n); zeros(1,n); zeros(1,n)];
+
+            %cInfo(1,i) = label of component
+            %cInfo(2,i) = number of pixels in component
+            %cInfo(3,i) = average brightness of component
+            %cInfo(4,i) = x-coordinate of center of component
+            %cInfo(5,i) = y-coordinate of center of component
+            %cInfo(6,i) = 0
+            %cInfo(7,i) = weighted x-coordinate of center of component
+            %cInfo(8,i) = weighted y-coordinate of center of component
+            %cInfo(9,i) = 0
+            %cInfo(10, i) = std. dev. of x-coordinate of component
+            %cInfo(11, i) = std. dev. of y-coordinate of component
+            %cInfo(12, i) = 0
+            %cInfo(13, i) = circle-ness of component
+
+            dims = size(M);
+
+            for y = 1:dims(1)
+                for x = 1:dims(2)
+                    if iM(y,x)>0
+                        ind = iM(y,x);
+                        cInfo(2,ind) = cInfo(2,ind)+1;
+                        cInfo(3,ind) = cInfo(3,ind)+M(y,x);
+                        cInfo(4,ind) = cInfo(4,ind)+ x;
+                        cInfo(5,ind) = cInfo(5,ind)+ y;
+                        cInfo(7,ind) = cInfo(7,ind)+ x*M(y,x);
+                        cInfo(8,ind) = cInfo(8,ind)+ y*M(y,x);
+                    end
+
+                end
+            end
+            
+            for i=1:n
+                cInfo(4,i) = cInfo(4,i)/cInfo(2,i);
+                cInfo(5,i) = cInfo(5,i)/cInfo(2,i);
+                cInfo(7,i) = cInfo(7,i)/cInfo(3,i);
+                cInfo(8,i) = cInfo(8,i)/cInfo(3,i);
+                cInfo(3,i) = cInfo(3,i)/cInfo(2,i);
+            end
+
+            
+            for y = 1:dims(1)
+                for x = 1:dims(2)
+                    if iM(y,x)>0
+                        ind = iM(y,x);
+                        cInfo(10, ind) = cInfo(10, ind) + (x - cInfo(4,ind))^2;
+                        cInfo(11, ind) = cInfo(11, ind) + (y - cInfo(5,ind))^2;
+                    end
+                end
+            end
+
+            for i=1:n
+                cInfo(10, i) = sqrt(cInfo(10, i)/cInfo(2,i));
+                cInfo(11, i) = sqrt(cInfo(11, i)/cInfo(2,i));
+                cInfo(13, i) = (cInfo(10,i)^2 + cInfo(11, i)^2 + cInfo(12, i)^2)/(cInfo(2,i));
+            end
+
+            [~, index] = sort(cInfo(2, :),'descend');
+            cInfo = cInfo(:, index);
+
+        end
+
+
+        function [info] = processData(obj, M, cutoffMin, cutoffMax, smooth)
+
+            if smooth
+                M = obj.smoothM(M);
+            end
+
+            bM = obj.toBinData(M, cutoffMin, cutoffMax);
+            iM = obj.toComponents(bM);
+            info = obj.getComponentInfo(iM, M);
+
+        end
+        
+        function [info] = processData2D(obj, M, cutoffMin, cutoffMax, smooth)
+
+            if smooth
+                M = obj.smoothM2D(M);
+            end
+
+            bM = obj.toBinData2D(M, cutoffMin, cutoffMax);
+            iM = obj.toComponents2D(bM);
+            info = obj.getComponentInfo2D(iM, M);
+
+        end
+        
+    end
+end

@@ -1,0 +1,11 @@
+Legend: 
+  * - An event occurred.
+  > - A write operation occurred.
+  < - A read operation occurred.
+ 
+1      Recording on 25-Nov-2013 at 10:49:10.585. Binary data in little endian format.
+2      > 24 ascii values.
+3      > 24 ascii values.
+4      > 24 ascii values.
+5        Recording off.
+
