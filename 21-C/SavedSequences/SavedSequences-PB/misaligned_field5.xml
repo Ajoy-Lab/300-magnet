@@ -1,0 +1,54 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the gui
+	
+	length_pi2_pulse = float(10e-9, 2e-9, 0.5)
+        tau = float(120e-6,-500e-6,500e-6)
+
+
+ 	mw_freq = float(2.87e9, 1e6, 20e9)
+	mw_ampl = float(2,2, 20)
+        start_time = float(850e-9,0,2e-6)
+
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+	PSeq = enable_channels(PSeq, 1:6, [1 1 1 1 1 1]);
+
+	PSeq = set_microwave(PSeq, mw_freq, mw_ampl);
+     PSeq = set_BNC(PSeq, mw_freq, mw_ampl,0);
+    
+
+    PSeq = polarize(PSeq,500e6);
+%    PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+    PSeq = ttl_pulse(PSeq, 1, 1e-6,0,false); %This is for polarizing nitrogen.
+    PSeq = wait(PSeq,start_time);
+    PSeq = ttl_pulse(PSeq, 3, 300e-9);
+    PSeq = wait(PSeq,300e-9);
+    PSeq = wait(PSeq,500e-9);
+    PSeq = wait(PSeq,300e-9);
+    PSeq = wait(PSeq,100e-9);
+    
+    PSeq = wait(PSeq,1e-6);
+
+    PSeq = polarize(PSeq,500e6);
+    PSeq = ttl_pulse(PSeq, 4, length_pi2_pulse);
+    PSeq = wait(PSeq, 18e-6);
+    PSeq = wait(PSeq, 30e-6);
+     
+  PSeq = ttl_pulse(PSeq, 1, 1e-6,tau,0); 
+  PSeq = wait(PSeq,start_time);
+PSeq = ttl_pulse(PSeq, 3, 300e-9);
+PSeq = wait(PSeq,55e-6);
+  PSeq = ttl_pulse(PSeq, 6, 50e-9); 
+
+    
+</instructions>
+
+</sequence>

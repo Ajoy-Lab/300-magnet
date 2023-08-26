@@ -1,0 +1,34 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the gui
+	
+	length_rabi_pulse = float(10e-9, 2e-9, 0.5)
+
+ 	mw_freq = float(2e9, 1e9, 20e9)
+	mw_ampl = float(-5,-15, 14)
+
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+	PSeq = enable_channels(PSeq, 1:5, [1 1 1 0 0]);
+
+	PSeq = set_microwave(PSeq, mw_freq, mw_ampl);
+    
+    PSeq = polarize_and_acquire_ref(PSeq,500e6);
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %Rabi pulse
+    PSeq = rabi_pulse(PSeq,500e6,length_rabi_pulse);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    PSeq = detection_and_acquire_ref(PSeq,500e6);
+    
+</instructions>
+
+</sequence>

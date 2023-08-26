@@ -1,0 +1,74 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the gui
+	
+	length_pi2_pulse = float(10e-9, 2e-9, 0.5)
+        tau = float(120e-6,0,500e-6)
+
+
+ 	mw_freq = float(2.87e9, 1e6, 20e9)
+	mw_ampl = float(-5,-28, 12)
+        start_time = float(926e-9,0,2e-6)
+
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+	PSeq = enable_channels(PSeq, 1:5, [1 1 1 1 1]);
+
+	PSeq = set_microwave(PSeq, mw_freq, mw_ampl);
+     PSeq = set_phase_lock_done(PSeq, mw_freq, mw_ampl,0);
+    
+
+    PSeq = polarize(PSeq,500e6);
+    PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+   PSeq = wait(PSeq,1e-6);
+    
+   %PSeq = wait(PSeq, 10e-6);
+    PSeq = polarize(PSeq,500e6);
+    % PSeq = wait(PSeq, 12*length_pi2_pulse);
+     
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+    PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+   PSeq = ttl_pulse(PSeq, 5, length_pi2_pulse);
+   PSeq = wait(PSeq, length_pi2_pulse);
+       
+ PSeq = ttl_pulse(PSeq, 1, 1.5e-6,-11*length_pi2_pulse,0); 
+ %PSeq = ttl_pulse(PSeq, 1, 1.5e-6,0,false); 
+PSeq = wait(PSeq,start_time);
+PSeq = ttl_pulse(PSeq, 4, 300e-9);
+%PSeq = wait(PSeq,300e-9);
+%PSeq = wait(PSeq,500e-9);
+%PSeq = wait(PSeq,300e-9);
+%PSeq = wait(PSeq,100e-9);
+% PSeq = wait(PSeq, 10e-6);
+% PSeq = ttl_pulse(PSeq, 4, 300e-9);
+    
+</instructions>
+
+</sequence>

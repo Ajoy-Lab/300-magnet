@@ -1,0 +1,164 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(500e6,1e7,5e9)
+mw_freq = float(3.024417e9, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(8,-30,17) %in dBm
+mod_depth = float(0.8,0,1)
+freqIQ = float(125e6, 0,500*1e6)
+lengthhalfcycle = float(20e-9,1e-9,200e-9) % Given by 1*(flipangle in rad)/(Rabi in circular)
+flip_angle = float(135,0,1000) %in degrees; here only to be recorded somewhere
+
+%adiabatic inversion
+do_adiabatic_inversion = boolean(1)
+sweep_range = float(200e6, 80e6, 500e6)
+sweep_time = float(600e-9, 100e-9, 1e-6)
+
+length_rotary_pulse = float(50e-9,1e-9,40e-6)
+
+delay_wrt_1mus = float(68e-9,0,500e-9) %calibrated by PL curve 11-08-05 13-17-48
+wait_time = float(100e-9, 0,1e-6)
+%st_dev = float(0.04,0,1)
+%correlation_time_of_noise=float(200e-9,10e-9,10e-6)
+
+do_rabi = boolean(0)
+
+%adiabatic inversion N
+N_do_adiabatic = boolean(0)
+N_sweep_range = float(20e6, 1e6,200e6)
+N_sweep_time = float(300e-9, 100e-9,1e-6)
+nb_N_cycles = float(2,1,10)
+is_shaped = boolean(1)
+freqN = float(0, 0,500*1e6)
+ampN = float(15,-30,17) %in dBm
+offset_from_res = float(2.14e6,-10e6,10e6) %hyperfine parallel of NV/N nucleus
+lengthpipulse = float(50e-9,1e-9,500e-9) %for the Rabi frequency expected to do this Pi pulse; if shaped_pulse, ignored
+    
+</variables>
+
+<shaped_pulses>
+
+%shaped_pulses{1} = load('blackman.mat');
+
+</shaped_pulses>
+
+<instructions>
+
+if N_do_adiabatic
+ch_on = [1 1 1 0 1];
+else
+ch_on = [1 1 1 0 0];
+end
+    
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5, ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+if N_do_adiabatic
+PSeq = set_nitrogen_rf(PSeq, freqN, ampN);
+end
+
+PSeq = polarize(PSeq,sample_rate, ch_on);
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time, ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Adiabatic inversion N
+if N_do_adiabatic
+for aux=1:1:nb_N_cycles
+PSeq = adiabatic_inversion_N(PSeq,sample_rate,N_sweep_range,N_sweep_time,freqIQ,-offset_from_res,lengthpipulse,is_shaped,1,ch_on);
+PSeq = polarize(PSeq,sample_rate,ch_on);
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = adiabatic_inversion_N(PSeq,sample_rate,N_sweep_range,N_sweep_time,freqIQ,offset_from_res,lengthpipulse,is_shaped,1,ch_on);
+PSeq = polarize(PSeq,sample_rate,ch_on);
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rotary
+
+%%This sequence plots the whole evolution
+
+%%%%%%%%%%%%%%%%%%%%%%Static noise
+%mean = 0;
+%noisenb = 0;
+%if length_rotary_pulse == 50e-9
+%a = normrnd(mean,st_dev);
+%noisenb = a;
+%save('noisevalue.mat','a');
+%else
+%load('noisevalue.mat');
+%noisenb = a;
+%end
+%%%%%%%%%%%%%%%%%%%%% END Static noise
+
+%%%% OU noise
+%if length_rotary_pulse == 50e-9
+%noisevc = sample_stoch_noise(st_dev^2,correlation_time_of_noise,1/sample_rate,int64(3.994e-6*sample_rate),1);
+%save('noiseOU.mat','noisevc');
+%else
+%load('noiseOU.mat');
+%end
+%we have int64(3.994e-6*sample_rate) steps in the scan
+%int64((length_rabi_pulse/3.994e-6)*sample_rate) gives me how many steps I have at this pulse length
+%noisevcthislength = noisevc(1:1:int64((length_rotary_pulse)*sample_rate));
+%%%%%%%%%%%%%%%%% END OU noise
+ 
+nb_half_cycles = floor(length_rotary_pulse/lengthhalfcycle);
+remaining_time = length_rotary_pulse - nb_half_cycles*lengthhalfcycle;% - mod(length_rotary_pulse - nb_half_cycles*length_half_cycle,1/sample_rate, ch_on);
+
+%those next 2 lines for OU noise
+%Aux=length(PSeq.Channels(2).Ampmod); 
+%%%%%%
+for n = 1:1:nb_half_cycles
+if mod(n,2) == 1 %if first half of cycle 
+angle = 0;
+else %if second half of cycle
+angle = pi;
+end
+%PSeq = rotary_pulse(PSeq,sample_rate,lengthhalfcycle,angle, ch_on); %original
+PSeq = rotary_pulse_mod(PSeq,sample_rate,mod_depth,lengthhalfcycle,angle,ch_on); %Mod // also to be used with OU noise
+%PSeq = rotary_pulse_mod_plus_CST_gaussian_static_noise(PSeq,sample_rate,lengthhalfcycle,angle,mod_depth,noisenb,ch_on); %cst noise
+end
+
+if mod(nb_half_cycles,2) == 1
+angle = pi;
+else
+angle = 0;
+end
+%PSeq = rotary_pulse(PSeq,sample_rate,remaining_time,angle, ch_on); %original
+PSeq = rotary_pulse_mod(PSeq,sample_rate,mod_depth,remaining_time,angle,ch_on); %mod // also to be used with OU noise
+%PSeq = rotary_pulse_mod_plus_CST_gaussian_static_noise(PSeq,sample_rate,remaining_time,angle,mod_depth,noisenb,ch_on); %cst noise
+
+%PSeq = add_OUnoise_on_pulse(PSeq,noisevcthislength,Aux); %only for OU noise
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Acquire Rotary and long-illumination 0 level reference
+PSeq = detection_and_acquire_ref(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+
+% Acquire 1 level reference 
+if do_adiabatic_inversion
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time, ch_on);
+PSeq = adiabatic_inversion(PSeq,sample_rate,sweep_range,sweep_time,freqIQ, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+end
+
+% Acquiring true 0 level reference 
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);  
+
+if do_rabi
+%Acquiring Rabi for comparision
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time, ch_on);
+PSeq = rabi_pulse(PSeq,sample_rate,length_rotary_pulse, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+end
+</instructions>
+
+</sequence>

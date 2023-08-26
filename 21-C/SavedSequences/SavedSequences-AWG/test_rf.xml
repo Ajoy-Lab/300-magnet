@@ -1,0 +1,56 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(500e6,1e7,5e9)
+freqN = float(0, 0,500*1e6)
+ampN = float(15,-30,17) %in dBmus
+length_rf_pulse = float(50e-9,1e-9,500e-9) 
+</variables>
+
+<shaped_pulses>
+
+%shaped_pulses{1} = load('blackman.mat');
+
+</shaped_pulses>
+
+<instructions>
+
+
+ch_on = [0 0 0 0 1];
+
+    
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5, ch_on); 
+
+%PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = set_nitrogen_rf(PSeq, freqN, ampN);
+
+
+% polarize and detection of 0 state
+%PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%R.F.pulse
+
+PSeq = rf_pulse(PSeq,sample_rate,length_rf_pulse,ch_on);
+
+%PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%CNOT gate
+
+%PSeq = rabi_pulse(PSeq,sample_rate,length_CNOT_pulse,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+</instructions>
+
+</sequence>

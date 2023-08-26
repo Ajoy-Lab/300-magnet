@@ -1,0 +1,54 @@
+<sequence>
+
+
+<variables>
+		% these are the variables that can be scanned or switched from the gui
+	a=float(1e-6,  2e-9,  0.5 ) % asldkasd
+	
+	
+ 	mw_freq = float(2e9, 1e3, 20e9)
+	mw_ampl = float(-5, -14, 10)
+    
+   
+</variables>
+
+<instructions>
+
+	PSeq = enable_channels(PSeq, 1:5, [1 1 0 0 1]);
+
+	PSeq = set_microwave(PSeq, mw_freq, mw_ampl);
+
+	PSeq = ttl_pulse(PSeq, 1, 20e-3,0,false);
+    PSeq = ttl_pulse(PSeq, 2, 20e-3,0,false);
+    PSeq = ttl_pulse(PSeq, 5, 20e-3);
+    
+    
+    %PSeq = ttl_pulse(PSeq, 1, 2e-6,a);
+	%PSeq = ttl_pulse(PSeq, 1, 3e-6, 2*a);
+    
+    
+   % PSeq = ttl_pulse(PSeq, 2, 20e-3,0,false);
+   % PSeq = ttl_pulse(PSeq, 1, 20e-3);
+    %PSeq = wait(PSeq, a);
+    %PSeq = ttl_pulse(PSeq, 1, a);
+    %PSeq = wait(PSeq, 2*a);
+    %PSeq = ttl_pulse(PSeq, 1, 3e-6);
+   % PSeq = ttl_pulse(PSeq,5,5e-6);
+    
+    
+	%PSeq = ttl_pulse(PSeq, 2, 2*a, a, true);
+	
+	%PSeq = wait(PSeq, 132);
+
+	%PSeq = ttl_pulse(PSeq, 1, 10, 1, true);
+%PSeq = ttl_pulse(PSeq, 2, 25);
+%	for k = 1:10
+%		PSeq = ttl_pulse(PSeq, 1, 10, 2*a, true);
+%	end;
+
+
+
+
+</instructions>
+
+</sequence>

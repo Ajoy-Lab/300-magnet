@@ -1,0 +1,26 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the GUI
+    laser = float(1e-3, 100e-9, 1000)
+ 	freq = float(300e6, 1e6, 3e9)
+	amp = float(-10, -70, 0)
+
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+	PSeq = enable_channels(PSeq, 1:16, [1 1 1 0 1 0 0 0 0 0 1 0 1 0 0 0]);
+   % PSeq = set_mw(PSeq,freq,amp);
+    
+    PSeq = ttl_pulse(PSeq, 2,laser);        %laser
+    PSeq = wait(PSeq, laser);        %laser
+      PSeq = ttl_pulse(PSeq, 3,laser);        %laser
+   % PSeq = ttl_pulse(PSeq, 1,laser+10e-9);
+    
+</instructions>
+
+</sequence>

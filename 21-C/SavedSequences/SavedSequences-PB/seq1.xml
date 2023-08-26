@@ -1,0 +1,44 @@
+<sequence>
+
+
+<variables>
+		% these are the variables that can be scanned or switched from the gui
+	a=float(12,  0.0,  15.0  ) % asldkasd
+	
+	b = boolean(1)
+    
+    bla = float(10,0,1)
+
+ 	mw_freq = float(22, 0, 30)
+	mw_ampl = float(23.5, 0, 30)
+
+</variables>
+
+<instructions>
+
+	PSeq = enable_channels(PSeq, 1:5, [1 1 1 1 1]);
+	PSeq = enable_channels(PSeq, 1, b);
+
+	PSeq = set_microwave(PSeq, mw_freq, mw_ampl);
+
+	PSeq = ttl_pulse(PSeq, 1, 10, 0.2, true);
+
+	PSeq = ttl_pulse(PSeq, 1, 10, 0.5, false);
+
+	PSeq = ttl_pulse(PSeq, 2, 2*a, a, true);
+	
+	PSeq = wait(PSeq, 132);
+
+	PSeq = ttl_pulse(PSeq, 1, 10, 1, true);
+
+%	for k = 1:10
+%		PSeq = ttl_pulse(PSeq, 1, 10, 2*a, true);
+%	end;
+
+	% ttlse(a,b,asd);
+
+%			adf %asd	# sdfkjs;lgkjaslgkjas;lkjas;lf
+
+</instructions>
+
+</sequence>

@@ -1,0 +1,54 @@
+<sequence>
+
+<variables>
+% these are the variables that can be scanned or switched from the gui
+	
+sample_rate = float(1e9,1e7,1.2e9)
+mw_freq = float(2e9, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(-3,-30,17) %in dBm
+freqIQ = float(1e6, 1e6,250*1e-6)
+sweep_range = float(400e6, 80e6, 500e6)
+sweep_time = float(500e-9, 100e-9, 1e-6)
+%add C_freq, N_freq, Camp, Namp
+
+length_rabi_pulse = float(10e-9, 2e-9, 0.5)
+    
+</variables>
+
+<shaped_pulses>
+
+    shaped_pulses{1} = load('pulse1.mat');
+    %shaped_pulses{2} = load('pulse2.mat');
+    
+</shaped_pulses>
+
+<instructions>
+
+ch_on = [1 1 1 0 0];
+    
+PSeq = set_sample_rate(sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5, ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = polarize_and_acquire_ref(PSeq,sample_rate, ch_on);
+
+PSeq = adiabatic_inversion_and_acquire_ref(PSeq,sample_rate,sweep_range,sweep_time, ch_on);
+
+PSeq = polarize(PSeq,sample_rate, ch_on);
+
+%Rabi pulse
+PSeq = rabi_pulse(PSeq,sample_rate,length_rabi_pulse, ch_on);
+
+%sequence: write something here
+%add capability of reading ampmod from file
+%must set Ampmod, FreqmodI, FreqmodQ, Phasemod
+%atualmente reading A(t)*cos(wt + phi(t)) -> see how to read that from Ix, Iy grape
+
+PSeq = detection(PSeq,sample_rate, ch_on);
+	
+</instructions>
+
+</sequence>

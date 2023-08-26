@@ -1,0 +1,81 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(250e6,1e7,5e9)
+mw_freq = float(4.2428e9, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(-15,-30,17) %in dBm
+freqIQ = float(62.5e6, 0,500*1e6)
+length_CNOT_pulse = float(640e-9,1e-9,3000e-9) 
+
+
+delay_wrt_1mus = float(68e-9,0,500e-9) %calibrated by PL curve 11-08-05 13-17-48
+wait_time = float(100e-9, 0,50e-6)
+
+
+
+freqN = float(7e6, 0,500*1e6)
+ampN = float(0,-30,1) %in dBmus
+length_rf_pulse = float(10e-6,1e-9,100e-6) 
+</variables>
+
+<shaped_pulses>
+
+%shaped_pulses{1} = load('blackman.mat');
+
+</shaped_pulses>
+
+<instructions>
+
+
+ch_on = [1 1 1 0 1];
+
+    
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5, ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = set_nitrogen_rf(PSeq, freqN, ampN);
+
+
+% polarize and detection of 0 state
+PSeq = polarize(PSeq,sample_rate, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+%PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%reference
+PSeq = rabi_pulse(PSeq,sample_rate,length_CNOT_pulse,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%R.F.pulse
+
+PSeq = rf_pulse(PSeq,sample_rate,length_rf_pulse,ch_on);
+%PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% polarize and detection of 0 state
+PSeq = polarize(PSeq,sample_rate, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+%PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%reference
+PSeq = rabi_pulse(PSeq,sample_rate,length_CNOT_pulse,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+
+  
+
+</instructions>
+
+</sequence>

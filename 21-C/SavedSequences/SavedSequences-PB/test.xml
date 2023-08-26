@@ -1,0 +1,72 @@
+   PSeq = wait(PSeq,round2(tau + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+   PSeq = wait(PSeq,round2(2*tau + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(tau+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau+(p+q)*2e-9 + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+   PSeq = wait(PSeq,round2(2*tau+(p+q)*4e-9 + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+      PSeq = wait(PSeq,round2(tau+(p+q)*2e-9+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(2*tau + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+   PSeq = wait(PSeq,round2(tau+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau+(p+q)*2e-9 + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(2*tau+(p+q)*4e-9 + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+      PSeq = wait(PSeq,round2(tau+(p+q)*2e-9+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+   PSeq = wait(PSeq,round2(2*tau + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(tau+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau+(p+q)*2e-9 + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+   PSeq = wait(PSeq,round2(2*tau+(p+q)*4e-9 + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+      PSeq = wait(PSeq,round2(tau+(p+q)*2e-9+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(2*tau + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+   PSeq = wait(PSeq,round2(tau+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau+(p+q)*2e-9 + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(2*tau+(p+q)*4e-9 + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+      PSeq = wait(PSeq,round2(tau+(p+q)*2e-9+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+   PSeq = wait(PSeq,round2(2*tau + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(tau+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau+(p+q)*2e-9 + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+   PSeq = wait(PSeq,round2(2*tau+(p+q)*4e-9 + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+      PSeq = wait(PSeq,round2(tau+(p+q)*2e-9+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau+(p+q)*2e-9 + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(2*tau+(p+q)*4e-9 + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+      PSeq = wait(PSeq,round2(tau+(p+q)*2e-9+ delta,2e-9)); 
+  
+   PSeq = wait(PSeq,round2(tau+(p+q)*2e-9 + delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,4, length_pi_Y); 
+   PSeq = wait(PSeq,round2(2*tau+(p+q)*4e-9 + 2*delta,2e-9)); 
+   PSeq = ttl_pulse(PSeq,2, length_pi_X); 
+      PSeq = wait(PSeq,round2(tau+(p+q)*2e-9+ delta,2e-9)); 
+  

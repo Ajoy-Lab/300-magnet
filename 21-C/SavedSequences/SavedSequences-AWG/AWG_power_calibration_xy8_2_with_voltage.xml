@@ -1,0 +1,47 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the gui
+	
+	length_rabi_pulse = AWGparam(10e-9, 2e-9, 0.5)
+   
+ 	mw_freq = AWGparam(1e6, 0.1e6, 500e6)
+    mw_ampl = AWGparam(0,-80, 10)
+   
+    tau = AWGparam(12e-9,0,500e6)
+    n= AWGparam(2,1,20)
+    
+    delay_DC = float(100e-9,-2e-6,2e-6)
+    DAQ_volt = float(0,0,5)
+    start_time = float(850e-9,0,2e-6)
+
+
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+PSeq = enable_channels(PSeq, 1:11, [1 1 1 1 1 1 1 0 0 0 1]);
+PSeq = awg_trigger_pulse(PSeq,500e6,length_rabi_pulse);
+%PSeq = set_BNC2(PSeq, BNC_width,4,0); 
+PSeq = set_DAQ(PSeq, 0,DAQ_volt,0); 
+
+PSeq = polarize(PSeq,500e6);
+PSeq = wait(PSeq,0.5e-6);
+PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+
+
+PSeq = polarize(PSeq,500e6);
+%PSeq = wait(PSeq,0.5e-6);
+PSeq = ttl_pulse(PSeq, 5, round2(n*(length_rabi_pulse+tau+400e-9),2e-9)); %% PB channel 5 triggers switch. length trigger= how long does the switch stays on  
+PSeq = ttl_pulse(PSeq,4,  1e-6,-round2(n*(length_rabi_pulse+tau+400e-9)-50e-9,2e-9),0);%% PB channel 4 triggers AWG, send out sequence
+PSeq = wait(PSeq,round2(n*(length_rabi_pulse+tau) + 1e-6,2e-9));
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+    
+</instructions>
+
+</sequence>

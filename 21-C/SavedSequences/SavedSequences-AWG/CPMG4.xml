@@ -1,0 +1,64 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(500e6,1e7,1.2e9)
+mw_freq = float(4.339e9, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(10,-30,17) %in dBm
+freqIQ = float(125e6, 0,500*1e6)
+wait_time = float(500e-9, 0,1e-6)
+delay_wrt_1mus = float(68e-9,0,500e-9) %calibrated by PL curve 11-08-05 13-17-48
+
+%adiabatic inversion
+do_adiabatic_inversion = boolean(1)
+sweep_range = float(200e6, 80e6, 500e6)
+sweep_time = float(600e-9, 100e-9, 1e-6)
+
+length_pi_over_2 = float(14e-9, 2e-9, 0.5)
+tau = float(2e-6,0,1)
+%aux = float(34e-9, 0, 0.5)
+%mod_depth = float(1,0,1)
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+ch_on = [1 1 1 0 0];
+    
+PSeq = set_sample_rate(PSeq,sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5,ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = polarize(PSeq,sample_rate,ch_on);
+
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Echo (envelope) pulses
+PSeq = CPMG4(PSeq,sample_rate,length_pi_over_2,tau,ch_on);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Acquire Echo and long-illumination 0 level reference
+PSeq = detection_and_acquire_ref(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+
+% Acquire 1 level reference 
+if do_adiabatic_inversion
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = adiabatic_inversion(PSeq,sample_rate,sweep_range,sweep_time,freqIQ,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+end
+
+% Acquiring true 0 level reference 
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);  
+
+	
+</instructions>
+
+</sequence>

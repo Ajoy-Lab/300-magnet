@@ -1,0 +1,83 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(0.5e9,1e7,5e9)
+mw_freq = float(1.759e9, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(10,-30,17) %in dBm
+freqIQ = float(125e6, 0,500*1e6)
+mod_mw = float(1,0,1);
+length_pi_over_2 = float(24e-9,0,10e-6);
+pi_pulse = float(48e-9,0,10e-6);
+delay_wrt_1mus = float(70e-9,0,500e-9); %calibrated by PL curve 11-08-05 13-17-48
+wait_time = float(100e-9, 0,1e-6);
+mod_rf = float(0.21,0,1);
+rf_freq = float(10e6,1e4,100e6);
+ampN = float(0,-20,20);
+wait_time_after_rf = float(0,0,1000e-6);
+%step=float(0,0,100e-6)
+m = float(1,0,1000);
+pulse_phase = float(0,-100,100);
+rf_phase = float(0,-100,100);
+delta = float(0,0,1000e-9);
+%tau = float(0,0,1e-3);
+%adiabatic inversion
+do_adiabatic_inversion = boolean(1)
+sweep_range = float(200e6, 80e6, 500e6)
+sweep_time = float(600e-9, 20e-9, 1e-6)
+
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+ch_on =  [1 1 1 0 1];
+    
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5,ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = set_nitrogen_rf(PSeq, rf_freq, ampN);
+
+PSeq = polarize(PSeq,sample_rate,ch_on);
+
+% Acquiring true 0 level reference 
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+
+
+% Acquire 1 level reference 
+if do_adiabatic_inversion
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = adiabatic_inversion(PSeq,sample_rate,sweep_range,sweep_time,freqIQ,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+else
+PSeq = rabi_pulse_mod(PSeq,sample_rate,pi_pulse,mod_mw,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+end
+
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rabi pulse with rf
+switch_wait=12e-9;
+%This is for usual spin echo
+tau = m/(rf_freq)-switch_wait-3*length_pi_over_2/2+delta;
+%This is for AC magnetometry
+%tau = 1/(2*rf_freq)-switch_wait-3*length_pi_over_2/2;
+PSeq = AC_magnetometry(PSeq,sample_rate,tau,length_pi_over_2,rf_freq,mod_rf,mod_mw,2*pi*pulse_phase,2*pi*rf_phase,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time_after_rf,ch_on);
+
+
+</instructions>
+
+</sequence>

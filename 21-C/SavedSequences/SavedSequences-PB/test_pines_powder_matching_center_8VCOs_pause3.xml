@@ -1,0 +1,153 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the GUI
+ 	d1=float(2,0,1000)
+	coil_position = float(617, 10, 1600)
+    bottom_wait_time= float(20, 0, 1000)
+    velocity=float(10, 1, 2000)
+    accn=float(100, 10, 30000)
+    jerk=float(1000, 100, 800000)
+    g_position=float(1440, 600, 1600)
+    nitro_time=float(1,0,300)
+    nitro_fill=float(1,-100,100)
+    
+    phase1 = float(0,-180,180);
+    phase2 = float(0,-180,180);
+    sweep_time1=float(0.015,0,20000);
+    sweep_time2=float(0.015,0,20000);
+    symm1 = float(100,0, 100);
+    symm2 = float(100,0, 100);
+    
+    % Agilent Sweeper
+    agilent_on=float(1,0,30);
+    Vpp = float(12.7628,0,16)
+    dc_level=float(7.9218,0,30);
+
+    % Rigol Sweeper2
+    rigol_on2=float(1,0,30);
+    Vpp2 = float(13.0035,0,16)    
+    dc_level2=float(7.9038,0,30);
+    
+    % Rigol Sweeper3
+    rigol_on3=float(1,0,30);
+    Vpp3 = float(13.0609,0,16);
+    dc_level3=float(8.0706,0,30);
+    
+    % HP Sweeper4
+    rigol_on4=float(1,0,30);
+    Vpp4 = float(10,0,16);
+    dc_level4=float(14,0,30);
+    
+    % Rigol Sweeper5
+    rigol_on5=float(1,0,30);
+    Vpp5 = float(13.0035,0,16)    
+    dc_level5=float(7.9038,0,30);
+    
+    % Rigol Sweeper6
+    rigol_on6=float(1,0,30);
+    Vpp6 = float(13.0035,0,16)    
+    dc_level6=float(7.9038,0,30);
+    
+    % Rigol Sweeper7
+    rigol_on7=float(1,0,30);
+    Vpp7 = float(13.0035,0,16)    
+    dc_level7=float(7.9038,0,30);
+    
+    % Rigol Sweeper8
+    rigol_on8=float(1,0,30);
+    Vpp8 = float(13.0035,0,16)    
+    dc_level8=float(7.9038,0,30);
+    
+    laser=float(100,0,100);
+    T1_wait_pos = float(1000,617,1447);
+    T1_wait_time = float(1000,0,120000);
+
+	pumping_time = float(15,0,3000);   %loop time for hyperpolarization wave
+    pause_time=float(2,1,10000);      %wait time at the top position
+    bw_center1=float(2.8,0.001,5.5);
+    bw_range1=float(0.7,0.001,5.5);
+    bw_center2=float(2.8,0.001,5.5);
+    bw_range2=float(0.7,0.001,5.5);
+    Freq_deviation=float(0,-1,1);
+    
+    Match_on_arb1=float(0,0,1);
+    Match_on_arb2=float(0,0,1);
+    Match_on_arb3=float(0,0,1);
+    Match_on_arb4=float(0,0,1);
+     Match_on_arb5=float(0,0,1);
+    Match_on_arb6=float(0,0,1);
+    Match_on_arb7=float(0,0,1);
+    Match_on_arb8=float(0,0,1);
+   
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+	PSeq = enable_channels(PSeq, 1:28, [1 0 0 0 1 0 0 0 0 1 1 1 1 0 0 0 0 0 1 1 1 1 1 0 1 1 1 1]);
+    % We use channel No.8 to run buffer(5)
+    %PSeq = set_mw_sweep(PSeq,start_freq,stop_freq,sweep_time,amp)
+    %PSeq = set_mw_sweep2(PSeq,start_freq2,stop_freq2,sweep_time2,amp2)
+    
+    
+    PSeq = set_waitpos(PSeq,T1_wait_pos,T1_wait_time);
+    PSeq = set_laser(PSeq,laser);
+    
+    PSeq = set_acstt1_2(PSeq,pause_time,pumping_time);
+  
+  %Set sweep time according to the bw_range, bw_range=0.7 then the sweep time is 0.015.
+  %sweep_time1=round2(0.015*bw_range1/0.7, 0.0001);
+  %sweep_time2=round2(0.015*bw_range2/0.7, 0.0001);
+  PSeq = set_agilent_arb3(PSeq,Vpp,0,sweep_time1,symm1,dc_level, agilent_on,bw_range1,bw_center1, Match_on_arb1);
+  PSeq = set_rigol_arb2_2(PSeq,Vpp2,-phase1,sweep_time1,symm1,dc_level2,rigol_on2,bw_range1,bw_center1+Freq_deviation, Match_on_arb2);
+  PSeq = set_rigol_arb3_2(PSeq,Vpp3,phase1,sweep_time1,symm1,dc_level3,rigol_on3,bw_range1,bw_center1+2*Freq_deviation, Match_on_arb3);
+  PSeq = set_hp_arb4_2(PSeq,Vpp4,-120,sweep_time1,symm1,dc_level4, rigol_on4, bw_range1, bw_center1+3*Freq_deviation, Match_on_arb4);
+  %PSeq = set_rigol_arb5(PSeq,Vpp,0,sweep_time1,symm2,dc_level,rigol_on1);
+  %PSeq = set_rigol_arb6(PSeq,Vpp2,-phase1,sweep_time1,symm2,dc_level2,rigol_on2);
+  %PSeq = set_rigol_arb7(PSeq,Vpp3,phase1,sweep_time1,symm2,dc_level3,rigol_on3);
+  %PSeq = set_rigol_arb8(PSeq,Vpp4,-120,sweep_time1,symm2,dc_level4,rigol_on4);
+  PSeq = set_rigol_arb9_2(PSeq,Vpp5,0,sweep_time2,symm2,dc_level5, rigol_on5,bw_range2,bw_center2, Match_on_arb5);
+  PSeq = set_rigol_arb10_2(PSeq,Vpp6,-phase2,sweep_time2,symm2,dc_level6,rigol_on6,bw_range2,bw_center2+Freq_deviation, Match_on_arb6);
+  PSeq = set_rigol_arb11_2(PSeq,Vpp7,phase2,sweep_time2,symm2,dc_level7,rigol_on7,bw_range2,bw_center2+2*Freq_deviation, Match_on_arb7);
+  PSeq = set_rigol_arb12_2(PSeq,Vpp8,180,sweep_time2,symm2,dc_level8, rigol_on8, bw_range2, bw_center2+3*Freq_deviation, Match_on_arb8);
+ 
+   
+    PSeq = set_acs_position2(PSeq, g_position,velocity, accn,jerk,coil_position, bottom_wait_time+pause_time+pumping_time);
+    
+  
+
+    PSeq = ttl_pulse(PSeq,5, 10e-6);
+    
+    PSeq = wait(PSeq,d1);
+    PSeq = ttl_pulse(PSeq,12, 20e-3);        %ACS
+    PSeq = ttl_pulse(PSeq, 1,pumping_time);   %LASER
+    PSeq = ttl_pulse(PSeq, 10,pumping_time,-(pumping_time),1); %MW AMP Switch
+    PSeq = ttl_pulse(PSeq, 11,pumping_time,-(pumping_time),1); % Trigger rigol 1,2,3,4
+    PSeq= wait(PSeq,pause_time);
+    
+    %PSeq= wait(PSeq,bottom_wait_time);
+    PSeq = ttl_pulse(PSeq, 1,bottom_wait_time);   %LASER
+    PSeq = ttl_pulse(PSeq, 10,bottom_wait_time,-(bottom_wait_time),1); %MW AMP Switch
+    
+    %Trigger rigol 1,2,3,4, if you want to reverse symmetry, change trigger to 13 and also uncomment arb5678, also open channel 14,15,6,7
+    PSeq = ttl_pulse(PSeq, 11,bottom_wait_time,-(bottom_wait_time),1); 
+    
+    
+   % PSeq = ttl_pulse(PSeq, 1,bottom_wait_time);   %LASER
+   % PSeq = ttl_pulse(PSeq, 10,bottom_wait_time,-(bottom_wait_time),1); %MW AMP Switch
+    
+    %Trigger rigol 1,2,3,4, if you want to reverse symmetry, change trigger to 13 and also uncomment arb5678, also open channel 14,15,6,7
+   % PSeq = ttl_pulse(PSeq, 11,bottom_wait_time,-(bottom_wait_time),1); 
+    
+    PSeq = wait(PSeq,3);
+    PSeq = ttl_pulse(PSeq,5, 10e-3);
+    
+   
+   
+    
+</instructions>
+
+</sequence>

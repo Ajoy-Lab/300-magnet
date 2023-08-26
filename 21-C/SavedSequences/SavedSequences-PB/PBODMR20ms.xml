@@ -1,0 +1,26 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the GUI
+ 	mw_freq = float(2e9, 1e3, 20e9)
+	mw_ampl = float(-8, -48, 14)
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+	PSeq = enable_channels(PSeq, 1:13, [1 0 0 0 1 0 0 0 0 0 1 1 1]);
+
+%PSeq = set_microwave(PSeq, mw_freq, mw_ampl);
+   % PSeq = set_rf(PSeq, mw_freq, mw_ampl);
+
+	PSeq = ttl_pulse(PSeq, 1, 1e-3);
+    PSeq = ttl_pulse(PSeq,11, 1e-3);
+    PSeq = ttl_pulse(PSeq, 12, 1e-3);    
+    PSeq =wait(PSeq,2e-3);
+     PSeq = ttl_pulse(PSeq, 5, 1e-3);
+</instructions>
+
+</sequence>

@@ -1,0 +1,116 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the GUI
+ 	d1=float(120,0,1000)
+	coil_position = float(150, 10, 1600)
+    wait_time= float(1, 0.25, 1000)
+    velocity=float(10, 1, 2000)
+    accn=float(100, 10, 30000)
+    jerk=float(1000, 100, 800000)
+    g_position=float(730, 600, 1600)
+    nitro_time=float(1,0,300)
+    nitro_fill=float(1,-100,100)
+    
+    phase = float(0,-180,180)
+    sweep_time=float(1,0,20000);
+    symm = float(100,0, 100);
+    
+    % Agilent Sweeper
+    agilent_on=float(1,0,30);
+    Vpp = float(5.8,0,10)
+    dc_level=float(14,0,30);
+
+    % Rigol Sweeper2
+    rigol_on2=float(1,0,30);
+    Vpp2 = float(10,0,10)
+    %phase2 = float(0,-180,180)
+    %sweep_time2=float(1,0,20000);
+    %symm2 = float(100,0, 100);
+    dc_level2=float(14,0,30);
+    % Rigol Sweeper3
+    rigol_on3=float(1,0,30);
+    Vpp3 = float(10,0,10)
+    %phase3 = float(0,-180,180)
+    %sweep_time3=float(1,0,20000);
+    %symm3 = float(100,0, 100);
+    dc_level3=float(14,0,30);
+    % HP Sweeper4
+    rigol_on4=float(1,0,30);
+    Vpp4 = float(10,0,10)
+    %phase4 = float(0,-180,180)
+    %sweep_time4=float(1,0,20000);
+    %symm4 = float(100,0, 100);
+    dc_level4=float(14,0,30);
+    
+    laser=float(100,0,100);
+    T1_wait_pos = float(1000,617,1447);
+    T1_wait_time = float(1000,0,400000);
+    
+    tt1=float(1000,0,400000);
+
+	
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+	PSeq = enable_channels(PSeq, 1:24, [1 0 0 0 1 0 0 0 0 1 1 1 1 0 0 0 0 0 1 1 1 1 1 0]);
+    %PSeq = set_mw_sweep(PSeq,start_freq,stop_freq,sweep_time,amp)
+    %PSeq = set_mw_sweep2(PSeq,start_freq2,stop_freq2,sweep_time2,amp2)
+    
+    PSeq = set_waitpos(PSeq,T1_wait_pos,T1_wait_time) 
+    PSeq = set_laser(PSeq,laser)
+    
+    %PSeq = set_agilent_arb2(PSeq,Vpp,phase,sweep_time,symm,dc_level, agilent_on)
+    
+   %theta/2theta
+   %PSeq = set_agilent_arb2(PSeq,Vpp,-2*phase,sweep_time,symm,dc_level, agilent_on)
+   %PSeq = set_rigol_arb3(PSeq,Vpp*7.1/5.8,-phase,sweep_time,symm,dc_level+0.94,rigol_on3)
+   %PSeq = set_rigol_arb2(PSeq,Vpp*6.3/5.8,phase,sweep_time,symm,(dc_level+0.04),rigol_on2)
+   %PSeq = set_hp_arb4(PSeq,Vpp*3.6/5.8,2*phase,sweep_time,symm,(8.19), rigol_on4)
+   
+   %1fixed at 0
+   %PSeq = set_agilent_arb2(PSeq,Vpp,0,sweep_time,symm,dc_level, agilent_on)
+   %PSeq = set_rigol_arb2(PSeq,Vpp*6.3/5.8,phase,sweep_time,symm,(dc_level+0.04),rigol_on2)
+   %PSeq = set_rigol_arb3(PSeq,Vpp*7.1/5.8,2*phase,sweep_time,symm,dc_level+0.94,rigol_on3)
+   %PSeq = set_hp_arb4(PSeq,Vpp*3.6/5.8,3*phase,sweep_time,symm,(8.19), rigol_on4)
+   
+ %optimized voltage value test
+  PSeq = set_agilent_arb2(PSeq,Vpp,0,sweep_time,symm,dc_level, agilent_on)
+  PSeq = set_rigol_arb2(PSeq,Vpp2,-phase,sweep_time,symm,dc_level2,rigol_on2)
+  PSeq = set_rigol_arb3(PSeq,Vpp3,phase,sweep_time,symm,dc_level3,rigol_on3)
+  PSeq = set_hp_arb4(PSeq,Vpp4,0,sweep_time,symm,dc_level4, rigol_on4)
+   
+   %1 fixed at 0, set of 3
+   %PSeq = set_agilent_arb2(PSeq,Vpp,0,sweep_time,symm,dc_level, agilent_on)
+   %PSeq = set_rigol_arb2(PSeq,Vpp,-phase,sweep_time,symm,dc_level,rigol_on2)
+   %PSeq = set_rigol_arb3(PSeq,Vpp,phase,sweep_time,symm,dc_level,rigol_on3)
+   %PSeq = set_hp_arb4(PSeq,Vpp,phase,sweep_time,symm,dc_level, rigol_on4)
+  
+    %PSeq = set_rigol_arb2(PSeq,3,phase2,sweep_time,symm,(dc_level+0.74),rigol_on2)
+   
+
+    PSeq = set_acs_position2(PSeq, g_position,velocity, accn,jerk,coil_position,wait_time);
+    PSeq = set_acstt1(PSeq, tt1);
+  
+
+    PSeq = ttl_pulse(PSeq,5, 10e-6);
+    
+    PSeq = wait(PSeq,d1);
+    PSeq = ttl_pulse(PSeq,12, 20e-3);        %ACS
+    PSeq = ttl_pulse(PSeq, 1,wait_time);   %LASER
+    PSeq = ttl_pulse(PSeq, 10,wait_time,-(wait_time),1); %MW AMP
+      % PSeq = ttl_pulse(PSeq, 11,wait_time,-(wait_time),1); %MW AMP
+      % PSeq = ttl_pulse(PSeq, 13,wait_time,-(wait_time),1); %MW AMP
+    PSeq = wait(PSeq,3);
+    PSeq = ttl_pulse(PSeq,5, 10e-3);
+    
+   
+   
+    
+</instructions>
+
+</sequence>

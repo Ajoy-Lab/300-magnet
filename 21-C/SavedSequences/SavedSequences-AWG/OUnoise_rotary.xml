@@ -1,0 +1,113 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(1e9,1e7,5e9)
+mw_freq = float(2e9, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(6,-30,17) %in dBm
+freqIQ = float(250e6, 0,500*1e6)
+lengthhalfcycle = float(54e-9,1e-9,200e-9) % Given by 1*(flipangle in rad)/(Rabi in circular)
+flip_angle = float(180,0,900) %in degrees; here only to be recorded somewhere
+correlation_time = float(50e-9,1e-9,10e-6)
+
+mod=float(0.9,0.1,1)
+
+%adiabatic inversion
+do_adiabatic_inversion = boolean(1)
+sweep_range = float(200e6, 80e6, 500e6)
+sweep_time = float(600e-9, 100e-9, 1e-6)
+
+length_rotary_pulse = float(50e-9,1e-9,20e-6)
+st_dev=float(0.05,0,0.5)
+delay_wrt_1mus = float(68e-9,0,500e-9) %calibrated by PL curve 11-08-05 13-17-48
+wait_time = float(500e-9, 0,1e-6)
+
+do_rabi = boolean(1)
+
+%adiabatic inversion N
+
+</variables>
+
+<shaped_pulses>
+
+%shaped_pulses{1} = load('blackman.mat');
+
+</shaped_pulses>
+
+<instructions>
+    
+ch_on = [1 1 1 0 0];
+
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5, ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+
+PSeq = polarize(PSeq,sample_rate, ch_on);
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time, ch_on);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rotary
+
+Aux=length(PSeq.Channels(2).Ampmod);
+
+%%This sequence plots the whole evolution
+
+nb_half_cycles = floor(length_rotary_pulse/lengthhalfcycle);
+remaining_time = length_rotary_pulse - nb_half_cycles*lengthhalfcycle;% - mod(length_rotary_pulse - nb_half_cycles*length_half_cycle,1/sample_rate, ch_on);
+
+for n = 1:1:nb_half_cycles
+if rem(n,2) == 1 %if first half of cycle 
+angle = 0;
+else %if second half of cycle
+angle = pi;
+end
+PSeq = rotary_pulse_mod(PSeq,sample_rate,mod,lengthhalfcycle,angle, ch_on); 
+end
+
+if rem(nb_half_cycles,2) == 1
+angle = pi;
+else
+angle = 0;
+end
+PSeq = rotary_pulse_mod(PSeq,sample_rate,mod,remaining_time,angle, ch_on);
+
+l2=length(PSeq.Channels(2).Ampmod);
+
+%Add Noise
+mean=0;
+PSeq=add_OUnoise_on_pulse(PSeq,sample_rate,correlation_time,st_dev,Aux);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Acquire Rotary and long-illumination 0 level reference
+PSeq = detection_and_acquire_ref(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+
+% Acquire 1 level reference 
+if do_adiabatic_inversion
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time, ch_on);
+PSeq = adiabatic_inversion(PSeq,sample_rate,sweep_range,sweep_time,freqIQ, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+end
+
+% Acquiring true 0 level reference 
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);  
+
+if do_rabi
+%Acquiring Rabi for comparision
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time, ch_on);
+PSeq = rabi_pulse(PSeq,sample_rate,length_rotary_pulse, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+end
+</instructions>
+
+</sequence>

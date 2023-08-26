@@ -1,0 +1,29 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the GUI
+ 	laser = float(1e-3, 1e-6, 1000)
+    nmr=float(500e-3, 1e-6,2)
+	position = float(150, 10, 1600)
+    velocity=float(10, 1, 2000)
+    accn=float(100, 10, 30000)
+    jerk=float(1000, 100, 800000)
+    coil=float(730, 600, 1100)
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+	PSeq = enable_channels(PSeq, 1:13, [1 0 0 0 1 0 0 0 0 0 1 1 1]);
+    PSeq = set_acs_position(PSeq, position,velocity,accn,jerk,coil);
+    
+    PSeq = ttl_pulse(PSeq, 1, laser);         %laser
+  
+    PSeq = ttl_pulse(PSeq,12, 10e-3);        %ACS
+    PSeq = wait(PSeq,nmr);
+    PSeq = ttl_pulse(PSeq, 11,10e-3);        %NMR
+</instructions>
+
+</sequence>

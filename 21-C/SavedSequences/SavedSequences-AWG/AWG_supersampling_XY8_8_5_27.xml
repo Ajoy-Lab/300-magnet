@@ -1,0 +1,54 @@
+
+<sequence>
+
+<variables>
+
+% these are the variables that can be scanned or switched from the gui
+	
+length_rabi_pulse = AWGparam(50e-9, 2e-9, 0.5)
+power_pi2_pulse = AWGparam(-10.2,-80, 9)
+
+ 	mw_freq = AWGparam(147e6, 1e6, 500e6)
+	mw_ampl = AWGparam(-10.2,-80, 9)
+phase = AWGparam(90,0, 359)
+tau = AWGparam(12e-9,0,500e6)
+start_time = float(926e-9,0,2e-6) 
+n= ProtectedPar(8,1, 40) 
+p= ProtectedPar(5,1, 40) 
+q= ProtectedPar(27,1, 40) 
+p1= ProtectedPar(1,0, 40) 
+q1= ProtectedPar(6,0, 40) 
+m1= ProtectedPar(4,0, 40) 
+p2= ProtectedPar(1,0, 40) 
+q2= ProtectedPar(3,0, 40) 
+</variables>
+ 
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+    
+  
+PSeq = enable_channels(PSeq, 1:7, [1 1 1 1 1 0 1]);
+PSeq = awg_trigger_pulse(PSeq,500e6,length_rabi_pulse);
+
+PSeq = polarize(PSeq,500e6);
+PSeq = wait(PSeq,0.5e-6);
+PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+
+PSeq = polarize(PSeq,500e6);
+
+PSeq = ttl_pulse(PSeq,4, 1e-6);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rabi pulse
+    
+    
+PSeq = wait(PSeq,(8*n+3)*(length_rabi_pulse+2*tau) + 1e-6);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+     
+</instructions>
+</sequence> 

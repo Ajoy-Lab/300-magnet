@@ -1,0 +1,59 @@
+<sequence>
+
+<variables>
+    % these are the variables that can be scanned or switched from the gui
+	
+	length_pi2_pulse = float(10e-9, 2e-9, 0.5)
+        tau = float(12e-9,0,500e-6)
+
+
+ 	mw_freq = float(2.87e9, 1e6, 20e9)
+	mw_ampl = float(-5,-28, 12)
+        start_time = float(926e-9,0,2e-6)
+
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+	PSeq = enable_channels(PSeq, 1:5, [1 1 1 1 0]);
+
+	PSeq = set_microwave(PSeq, mw_freq, mw_ampl);
+   %PSeq = set_rf(PSeq, mw_freq, mw_ampl);
+    
+    PSeq = polarize(PSeq,500e6);
+    PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+    PSeq = wait(PSeq,1e-6);
+    
+    %PSeq = polarize(PSeq,500e6);
+    %%PSeq = rabi_pulse(PSeq,500e6,2*length_pi2_pulse);
+    %PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+    %PSeq = wait(PSeq,1e-6);
+    
+    PSeq = polarize(PSeq,500e6);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %Ramsey pulse
+    PSeq = ttl_pulse(PSeq, 4, length_pi2_pulse);
+    PSeq = wait(PSeq, tau);
+    PSeq = ttl_pulse(PSeq, 4, 2*length_pi2_pulse);
+    PSeq = wait(PSeq, tau);
+    PSeq = ttl_pulse(PSeq, 4, 2*length_pi2_pulse);
+    PSeq = wait(PSeq, tau);
+     PSeq = ttl_pulse(PSeq, 4, 2*length_pi2_pulse);
+    PSeq = wait(PSeq, tau);
+     PSeq = ttl_pulse(PSeq, 4, 2*length_pi2_pulse);
+    PSeq = wait(PSeq, tau);
+     PSeq = ttl_pulse(PSeq, 4, 2*length_pi2_pulse);
+    PSeq = wait(PSeq, tau);
+    PSeq = ttl_pulse(PSeq, 4, length_pi2_pulse);
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    PSeq = detection_and_acquire_ref3(PSeq,500e6,start_time);
+    
+</instructions>
+
+</sequence>

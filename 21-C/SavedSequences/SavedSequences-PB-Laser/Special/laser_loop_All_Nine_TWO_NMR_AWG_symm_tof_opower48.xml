@@ -1,0 +1,120 @@
+        <sequence>
+
+        <variables>
+            % these are the variables that can be scanned or switched from the GUI
+            d1=float(2,0,1000)
+            coil_position = float(617, 10, 1600)
+            wait_time= float(20, 0, 10000)
+            velocity=float(10, 1, 2000)
+            accn=float(100, 10, 30000)
+            jerk=float(1000, 100, 800000)
+            g_position=float(1440, 600, 1600)
+            attenuation=float(0,0,30)
+            nitro_fill=float(1,-100,10000)
+
+           sweep_freq=float(0.015,0,20000);
+           awg_center_freq=float(3.825e9,2e9,5e9);  %this doubles as center freq
+           %  awg_start_freq=float(3e9,2e9,5e9);
+           awg_bw_freq=float(12e6,1e3,1e9);   %this doubles bandwidth
+           %  awg_stop_freq=float(3e9,2e9,5e9); 
+           awg_amp=float(0.1,0,0.6);
+           
+           srs_freq=float(4e9,2e9,5e9);
+           srs_amp=float(3,-18,6);
+       
+            current=float(0,-5,5);
+            current2=float(0,-5,5);
+            pw=float(10,0,200);
+            d3=float(2,0,1000);
+            loop_num=float(2,0,2000);
+            sequence_type=float(0,0,10);
+            
+            laser=float(100,0,100);
+            T1_wait_pos = float(1000,617,1447);
+            T1_wait_time = float(1000,0,120000);
+            tt1= float(0,0,3000000);
+            
+            sweep_sigma = float(1,0.01,20);
+            symm = float(0,0,1);
+            tof = float(-14304.3,-1e6,1e6);
+        </variables>
+
+        <shaped_pulses>
+
+        </shaped_pulses>
+
+        <instructions>
+            channel_vec=[1 0 0 0 1 0 1 0 0 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 0 0 1 1 1];
+            channel_vec(30)=0; channel_vec(31)=0;channel_vec(32)=0;channel_vec(33)=0; %turn off RAMPs
+            PSeq = enable_channels(PSeq, 1:39,channel_vec );
+
+
+            %CHANNEL 14: MW SWITCH
+            %CHANNEL 34: HELMHOLTZ COIL PSU
+
+
+            %CHANNEL 7: GREEN LASER FIBER 1
+            %CHANNEL 10: GREEN LASER FIBER 2
+            %CHANNEL 11: GREEN LASER FIBER 3
+            %CHANNEL 13: GREEN LASER FIBER 4
+            %CHANNEL 15: GREEN LASER FIBER 5
+            %CHANNEL 17: GREEN LASER FIBER 6
+            %CHANNEL 18: GREEN LASER FIBER 7
+            %CHANNEL 19: GREEN LASER FIBER 8
+
+           PSeq = set_waitpos(PSeq,T1_wait_pos,T1_wait_time);
+           PSeq = set_laser(PSeq,laser);
+           PSeq = set_acstt1(PSeq, tt1);
+            PSeq = set_att(PSeq, attenuation);
+            PSeq = set_helmholtz(PSeq,current);
+            PSeq = set_helmholtz2(PSeq,current2);
+            
+            
+            %------ AWG and SRS -------------
+         
+         %  PSeq = set_awg(PSeq,awg_center_freq,awg_bw_freq,awg_amp,sweep_freq,sweep_sigma);
+           PSeq = set_awg_symm(PSeq,awg_center_freq,awg_bw_freq,awg_amp,sweep_freq,sweep_sigma,symm);
+           PSeq = set_srs(PSeq,srs_freq,srs_amp);
+            
+            %%-----------NMR PARAMETERS--------------------------
+          PSeq = set_nmr_parameters(PSeq,pw,d3,tof,sequence_type);
+
+           
+           
+           PSeq = set_acs_position2(PSeq, g_position,velocity, accn,jerk,coil_position,wait_time);
+           
+           PSeq = ttl_pulse(PSeq,5, 10e-6);
+           
+           PSeq = wait(PSeq,d1);
+           PSeq = ttl_pulse(PSeq,12, 20e-3);        %ACS
+           
+           PSeq = ttl_pulse(PSeq, 14,wait_time);                   %%MW SWITCH
+           
+           
+           PSeq = ttl_pulse(PSeq, 16,wait_time, -wait_time, 1) 
+           
+
+
+
+%          PSeq = ttl_pulse(PSeq, 17,wait_time, -wait_time, 1);  %Board 16
+	%          PSeq = ttl_pulse(PSeq, 15,wait_time, -wait_time, 1); %Board 14
+	          PSeq = ttl_pulse(PSeq, 11,wait_time, -wait_time, 1); %Board 10
+	          PSeq = ttl_pulse(PSeq, 13,wait_time, -wait_time, 1); %Board 12
+	          PSeq = ttl_pulse(PSeq, 10,wait_time, -wait_time, 1); %Board 9
+	          PSeq = ttl_pulse(PSeq, 7,wait_time, -wait_time, 1);  %Board 6
+
+
+          
+          
+           
+           PSeq = ttl_pulse(PSeq, 19,wait_time, -wait_time, 1); 
+           PSeq = ttl_pulse(PSeq, 18,wait_time, -wait_time, 1); 
+            
+           PSeq = wait(PSeq,3);
+           PSeq = ttl_pulse(PSeq,5, 10e-3);
+           
+     
+</instructions>
+
+</sequence>
+  

@@ -1,0 +1,96 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(100e6,1e7,5e9)
+mw_freq = float(1.760800000000000e+09, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(10,-30,17) %in dBm
+freqIQ = float(25e6, 0,500*1e6)
+length_pulse1 = float(900e-9,0,30000e-9) 
+length_pulse2 = float(900e-9,0,30000e-9) 
+rf_pi_pulse = float(0,0,10e-6) 
+freq_rf_pi_pulse = float(7.273438e6, 0,500*1e6)
+delay_wrt_1mus = float(70e-9,0,10e-6) %calibrated by PL curve 11-08-05 13-17-48
+wait_time = float(500e-9, 0,200e-6)
+mod_depth1 = float(0.03,0,1)
+mod_depth2 = float(0.03,0,1)
+freqN = float(2.9107e6, 0,500*1e6)
+ampN = float(0,-30,20) %in dBmus
+mod_rf = float(1,0,1)
+length_rf_pulse = float(0,0,1000e-6) 
+relax_time1 = float(0, 0,5e-3)
+relax_time2 = float(0, 0,5e-3)
+</variables>
+
+<shaped_pulses>
+
+%shaped_pulses{1} = load('blackman.mat');
+
+</shaped_pulses>
+
+<instructions>
+
+
+ch_on = [1 1 1 0 1];
+%ch_on = [1 1 1 0 0];
+
+    
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5, ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = set_nitrogen_rf(PSeq, freqN, ampN);
+
+
+% polarize and detection of 0 state
+PSeq = polarize(PSeq,sample_rate, ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+%PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%reference
+PSeq = rabi_pulse_mod(PSeq,sample_rate,length_pulse1,mod_depth1,ch_on);
+%PSeq =mod_rf_pulse(PSeq,sample_rate,rf_pi_pulse,freqN,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%CNOT gate
+
+%PSeq = rabi_pulse(PSeq,sample_rate,length_CNOT_pulse,ch_on);
+PSeq = rabi_pulse_mod(PSeq,sample_rate,length_pulse1,mod_depth1,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%R.F.pulse
+PSeq =mod_rf_pulse(PSeq,sample_rate,length_rf_pulse,freqN,mod_rf,ch_on);
+%PSeq = rf_pulse(PSeq,sample_rate,length_rf_pulse,ch_on);
+PSeq = wait_for_awg(PSeq,sample_rate,relax_time1,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%CNOT gate
+
+%PSeq = rabi_pulse(PSeq,sample_rate,length_CNOT_pulse,ch_on);
+PSeq = rabi_pulse_mod(PSeq,sample_rate,length_pulse2,mod_depth2,ch_on);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% detection
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+PSeq = wait_for_awg(PSeq,sample_rate,relax_time2,ch_on);
+
+
+
+
+
+  
+
+</instructions>
+
+</sequence>

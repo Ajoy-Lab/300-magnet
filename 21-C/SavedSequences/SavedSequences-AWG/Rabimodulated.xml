@@ -1,0 +1,98 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(1e9,1e7,5e9)
+mw_freq = float(1.76e9, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(10,-30,17) %in dBm
+freqIQ = float(250e6, 0,500*1e6)
+mod_depth = float(0.8,0,1)
+
+%adiabatic inversion
+do_adiabatic_inversion = boolean(1)
+sweep_range = float(200e6, 80e6, 500e6)
+sweep_time = float(600e-9, 20e-9, 1e-6)
+
+length_rabi_pulse = float(50e-9, 0, 0.5)
+
+delay_wrt_1mus = float(68e-9,0,500e-9) %calibrated by PL curve 11-08-05 13-17-48
+wait_time = float(100e-9, 0,1e-6)
+switch_delay= float(10e-9, 0,1e-6);
+
+st_dev=float(0,0,0.5)
+correlation_time_of_noise=float(0,0,10e-6)
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+ch_on =  [1 1 1 0 0];
+    
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5,ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = polarize(PSeq,sample_rate,ch_on);
+
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rabi pulse
+%PSeq = adiabatic_inversion(PSeq,sample_rate,sweep_range,sweep_time,freqIQ,ch_on);
+%PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+%PSeq = rabi_pulse_mod(PSeq,sample_rate,length_rabi_pulse,mod_depth,ch_on);
+
+PSeq = rabi_pulse_mod_wait_time(PSeq,sample_rate,length_rabi_pulse,mod_depth,switch_delay,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%% OU noise
+%if length_rabi_pulse == 50e-9
+%noisevc = sample_stoch_noise(st_dev^2,correlation_time_of_noise,1/sample_rate,int64(3.994e-6*sample_rate),1);
+%save('noiseOU.mat','noisevc');
+%else
+%load('noiseOU.mat');
+%end
+%we have int64(3.994e-6*sample_rate) steps in the sequence
+%int64((length_rabi_pulse/3.994e-6)*sample_rate) gives me how many steps I have at this pulse length
+%noisevcthislength = noisevc(1:1:int64((length_rabi_pulse)*sample_rate));
+%PSeq = rabi_pulse_mod_for_OU(PSeq,sample_rate,length_rabi_pulse,mod_depth,noisevcthislength,ch_on);
+%%%%%%%%%%%% END OU noise
+
+%%%%%%%%%%%% Static noise
+%mean = 0;
+%noisenb = 0;
+%if length_rabi_pulse == 50e-9
+%a = normrnd(mean,st_dev);
+%noisenb = a;
+%save('noisevalue.mat','a');
+%else
+%load('noisevalue.mat');
+%noisenb = a;
+%end
+%Pseq = rabi_pulse_mod_plus_CST_gaussian_static_noise(PSeq,sample_rate,length_rabi_pulse,mod_depth,noisenb,ch_on);
+%%%%%%%%%%%%%%%%%%%% END Static noise
+
+% Acquire Rabi and long-illumination 0 level reference
+PSeq = detection_and_acquire_ref(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+
+% Acquire 1 level reference 
+if do_adiabatic_inversion
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = adiabatic_inversion(PSeq,sample_rate,sweep_range,sweep_time,freqIQ,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+end
+
+% Acquiring true 0 level reference 
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+
+</instructions>
+
+</sequence>

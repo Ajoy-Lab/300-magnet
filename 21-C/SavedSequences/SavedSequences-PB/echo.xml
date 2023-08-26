@@ -1,0 +1,43 @@
+<sequence>
+
+<variables>
+		% these are the variables that can be scanned or switched from the gui
+	
+	length_pi2 = float(10e-9, 2e-9, 0.5)
+      tau = float(120e-6,0,500e-6)
+
+
+ 	mw_freq = float(2e9, 1e9, 3e9)
+	mw_ampl = float(10, 0, 11)
+
+</variables>
+
+<instructions>
+
+	PSeq = enable_channels(PSeq, 1:5, [1 1 1 0 0]);
+
+	PSeq = set_microwave(PSeq, mw_freq, mw_ampl);
+    
+    %polarize and acquire ref
+    PSeq = ttl_pulse(PSeq, 1, 1e-6);
+    PSeq = wait(PSeq, 500e-9);
+    PSeq = ttl_pulse(PSeq, 3, 100e-9);
+    PSeq = wait(PSeq, 900e-9);
+    
+    %echo
+    PSeq = ttl_pulse(PSeq, 2, length_pi2);
+    PSeq = wait(PSeq, tau);
+    PSeq = ttl_pulse(PSeq,2, 2*length_pi2);
+    PSeq = wait(PSeq,tau);
+    PSeq = ttl_pulse(PSeq, 2, length_pi2);
+
+    
+    %Detection
+    PSeq = wait(PSeq, 10e-9);
+    PSeq = ttl_pulse(PSeq, 1, 1.5e-6,0,false);
+    PSeq = ttl_pulse(PSeq, 3, 100e-9,1e-6,true);
+
+	
+</instructions>
+
+</sequence>

@@ -1,0 +1,206 @@
+        <sequence>
+
+        <variables>
+            % these are the variables that can be scanned or switched from the GUI
+            d1=float(2,0,1000)
+            coil_position = float(617, 10, 1600)
+            wait_time= float(20, 0, 10000)
+            velocity=float(10, 1, 2000)
+            accn=float(100, 1, 30000)
+            jerk=float(1000, 1, 800000)
+            g_position=float(1440, 300, 1600)
+            attenuation=float(0,0,30)
+            nitro_fill=float(1,-100,10000)
+
+           sweep_freq=float(0.015,0,20000);
+           awg_center_freq=float(3.825e9,2e9,5e9);  %this doubles as center freq
+           %  awg_start_freq=float(3e9,2e9,5e9);
+           awg_bw_freq=float(12e6,1e3,1e9);   %this doubles bandwidth
+           %  awg_stop_freq=float(3e9,2e9,5e9); 
+           awg_amp=float(0.1,0,1.5);
+           
+           srs_freq=float(4e9,2e9,5e9);
+           srs_amp=float(3,-18,6);
+       
+            current=float(0,-5,5);
+            current2=float(0,-5,5);
+            pw=float(-100,0,10000);
+            tacq=float(1,0,20000);
+            loop_num=float(2,0,2000);
+            sequence_type=float(0,0,10);
+            
+            laser=float(1,1,31);
+            T1_wait_pos = float(1000,617,1467);
+            T1_wait_time = float(0,0,7200000);
+            tt1= float(0,0,3000000);
+            
+            sweep_sigma = float(1,0.01,20);
+            symm = float(0,0,1);
+            tof = float(-14304.3,-1e6,1e6);
+            laser_sequence = float(1,1,31);
+            %gain=float(-100000,1,50000);
+            gain=float(-100,0,10000);
+            
+            rigol_Vpp = float(1,0,1);
+            rigol_freq = float(1e-6,0,20e3); 
+            rigol_DC_offset = float(0.1,-1,1);
+
+            rigol_swp_sta=float(1e-6,0,20e3);
+            rigol_swp_stop=float(1e-6,0,20e3);
+            Tchirp=float(1e-3,0,500);
+            mod_state=float(0,0,10);
+            mod_freq=float(10,2e-3,1e3);
+            rigol_time1=float(15,0,1e3);
+            rigol_wait1=float(2,-1e3,1e3);
+            rigol_wait2=float(2,-1e2,100);
+            rigol_time2=float(15,0,1e3);
+            Tmax=float(0,0,1e3);
+            pw3=float(85,0,500);
+
+            rigol2_Vpp = float(1,0.004,1);
+            rigol2_freq = float(1e-6,0,20e3); 
+            rigol2_DC_offset = float(0.1,-1,1);
+            rigol2_phase = float(0.0,-360,360);
+
+            rigol_rep = float(1,1,10);
+            
+            fliptime = float(0,0,10000);
+           
+            poltime1 = float(0,0,150);
+            poltime2 = float(0,0,150);
+            poltime3 = float(0,0,150);
+            poltime4 = float(0,0,150);
+            poltime5 = float(0,0,150);
+            poltime6 = float(0,0,150);
+            starting_pol_sign =float(1,-1,1) 
+
+           
+            
+        </variables>
+
+        <shaped_pulses>
+
+        </shaped_pulses>
+
+        <instructions>
+
+            channel_vec=[1 0 1 0 1 1 1 0 0 1 1 1 1 1 1 1 1 1 1 0 0 0 0 1 0 0 0 0 1 1 1 1 1 1 0 0 1 1 1 0 1 1 0 0 1 0];
+            channel_vec(30)=0; channel_vec(31)=0;channel_vec(32)=0;channel_vec(33)=0; %turn off RAMPs
+             channel_vec(20)=1;      channel_vec(8)=0;   channel_vec(18)=1;
+% channels 42 and 45 need to be both on for magnetometry
+            
+            PSeq = enable_channels(PSeq, 1:46,channel_vec);
+
+            if channel_vec(46)==1
+                 total_wait_time = poltime1+poltime2+poltime3+poltime4+poltime5+poltime6;
+           else
+                 total_wait_time = wait_time;
+          end
+
+
+            %CHANNEL 14: MW SWITCH
+            %CHANNEL 34: HELMHOLTZ COIL PSU
+
+
+            %CHANNEL 7: GREEN LASER FIBER 1
+            %CHANNEL 10: GREEN LASER FIBER 2
+            %CHANNEL 11: GREEN LASER FIBER 3
+            %CHANNEL 13: GREEN LASER FIBER 4
+            %CHANNEL 15: GREEN LASER FIBER 5
+            %CHANNEL 17: GREEN LASER FIBER 6
+            %CHANNEL 18: GREEN LASER FIBER 7
+            %CHANNEL 19: GREEN LASER FIBER 8
+                        
+            PSeq = set_waitpos_fliptime(PSeq,T1_wait_pos,T1_wait_time,fliptime);
+           PSeq = set_laser_dome2(PSeq,laser,laser_sequence);
+           PSeq = set_acstt1(PSeq, tt1);
+            PSeq = set_att(PSeq, attenuation);
+            PSeq = set_helmholtz(PSeq,current);
+            PSeq = set_helmholtz2(PSeq,current2);
+            
+            
+            %------ AWG and SRS -------------
+         
+         %  PSeq = set_awg(PSeq,awg_center_freq,awg_bw_freq,awg_amp,sweep_freq,sweep_sigma);
+           PSeq = set_awg_symm(PSeq,awg_center_freq,awg_bw_freq,awg_amp,sweep_freq,sweep_sigma,symm);
+           PSeq = set_srs(PSeq,srs_freq,srs_amp);
+            
+            %%-----------NMR PARAMETERS--------------------------
+          PSeq = set_nmr_parameters(PSeq,pw,tacq,gain,tof,sequence_type);
+
+           %%-----------RIGOL FOR MAG--------------------------
+                  PSeq = set_rigol_mag2(PSeq,rigol_Vpp,rigol_freq,mod_state,mod_freq,rigol_DC_offset,rigol_rep);
+                  PSeq = set_rigol_sweep(PSeq,rigol_swp_sta,rigol_swp_stop,Tchirp);
+                  PSeq = set_rigol_twotime(PSeq,rigol_time1,rigol_wait2,rigol_time2,Tmax,pw3,rigol_wait1);
+                  PSeq = set_rigol_mag3(PSeq,rigol2_Vpp,rigol2_freq,rigol2_DC_offset,rigol2_phase);
+                  PSeq = set_ykickseq(PSeq,pw3);
+
+
+           %%-----------TASK TABLE--------------------------
+                  PSeq = set_tasktable(PSeq,poltime1,poltime2,poltime3,poltime4,poltime5,poltime6,starting_pol_sign);
+
+           %%---------------------------------------------------
+           PSeq = set_acs_position2(PSeq, g_position,velocity, accn,jerk,coil_position,total_wait_time);
+           
+           PSeq = ttl_pulse(PSeq,5, 10e-6);
+           
+           PSeq = wait(PSeq,d1);
+           PSeq = ttl_pulse(PSeq,12, 20e-3);        %ACS
+
+
+          PSeq = ttl_pulse(PSeq, 18, 1000e-3); %proteus AWG
+           
+           PSeq = ttl_pulse(PSeq, 14,total_wait_time,-1000e-3,1);                   %%MW SWITCH
+
+          PSeq = ttl_pulse(PSeq, 17,total_wait_time, -total_wait_time, 1); %laserboard2
+          PSeq = ttl_pulse(PSeq, 15,total_wait_time, -total_wait_time, 1); %laserboard3
+          PSeq = ttl_pulse(PSeq, 11,total_wait_time, -total_wait_time, 1); %BOTTOM
+          PSeq = ttl_pulse(PSeq, 13,total_wait_time, -total_wait_time, 1);
+          PSeq = ttl_pulse(PSeq, 10,total_wait_time, -total_wait_time, 1);
+           PSeq = ttl_pulse(PSeq, 16,total_wait_time, -total_wait_time, 1); %laserboard1
+           
+           PSeq = ttl_pulse(PSeq, 7,total_wait_time, -total_wait_time, 1); 
+           PSeq = ttl_pulse(PSeq, 19,total_wait_time, -total_wait_time, 1); 
+           
+           PSeq = ttl_pulse(PSeq, 18,total_wait_time, -total_wait_time, 1); 
+            
+           PSeq = wait(PSeq,4); %wait until shuttling ends
+                       PSeq= wait(PSeq, 4); %wait until tabor is set
+
+           PSeq = ttl_pulse(PSeq, 3, 1e-3); %triggers pulse sequence and acquisition
+
+        %  PSeq= wait(PSeq, -1);
+
+            if channel_vec(45)==1 %gated trigger
+        %PSeq=wait(PSeq,1); %hardcoded 1 sec wait
+            PSeq= ttl_pulse(PSeq, 1, rigol_rep*(rigol_time1+rigol_time2+rigol_wait1+rigol_wait2));
+            PSeq = wait(PSeq, -rigol_rep*(rigol_time1+rigol_time2+rigol_wait1+rigol_wait2));
+         
+            % PSeq = wait(PSeq, 1.25); %for square wave gating
+            %for i=1:4
+            %PSeq= ttl_pulse(PSeq, 5, 5);
+            %PSeq = wait(PSeq, 2.5);
+            %end
+            %PSeq = wait(PSeq, -31.25);
+
+            end
+
+           if channel_vec(42)==1
+               for ind=1:rigol_rep
+                   PSeq= wait(PSeq, rigol_wait1);
+                   PSeq = ttl_pulse(PSeq, 6, rigol_time1); %first rigol trigger
+                   PSeq = ttl_pulse(PSeq, 1, rigol_time1,-rigol_time1,1); %gate mode 
+                   PSeq = wait(PSeq, rigol_wait2); %off time between rigol
+                   PSeq = ttl_pulse(PSeq, 20, rigol_time2); %second rigol trigger
+                    PSeq = ttl_pulse(PSeq, 1, rigol_time2,-rigol_time2,1); %gate mode 
+                   
+               end
+
+           end
+
+           %PSeq=wait(PSeq,-1); %undoes the hardcoded 1 sec wait
+     
+</instructions>
+
+</sequence>
+  

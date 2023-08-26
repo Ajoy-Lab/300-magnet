@@ -1,0 +1,106 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(1e9,1e7,5e9)
+mw_freq = float(2e9, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(6,-30,17) %in dBm
+freqIQ = float(250e6, 0,500*1e6)
+rabi_frequency = float(5e6,1e6,20e6) % in Hz
+flip_angle = float(180,0,360) %in degrees
+Nb_cycles = float(5,1,1000)
+
+%adiabatic inversion
+do_adiabatic_inversion = boolean(1)
+sweep_range = float(400e6, 80e6, 500e6)
+sweep_time = float(500e-9, 100e-9, 1e-6)
+
+delay_wrt_1mus = float(68e-9,0,500e-9) %calibrated by PL curve 11-08-05 13-17-48
+wait_time = float(500e-9, 0,1e-6)
+
+two_points_per_cycle = boolean(0);
+    
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+ch_on = [1 1 1 0 0];
+    
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5,ch_on ); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = polarize(PSeq,sample_rate,ch_on);
+
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rotary
+
+flip_angle_rad = flip_angle*pi/180;
+
+if two_points_per_cycle
+
+%This sequence would plot the population twice per cycle
+for n = 1:1:2*Nb_cycles
+if mod(n,2) == 1 %first half of cycle
+angle = 0;
+else
+angle = pi;
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%Rotary cycle of +X-X, by an angle given in degrees by flip_angle
+PSeq = rotary_pulse(PSeq,sample_rate,flip_angle_rad/rabi_frequency/2/pi - mod(flip_angle_rad/rabi_frequency/2/pi,1/sample_rate),angle,ch_on);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+end
+
+else
+
+%This sequence would plot the population in the end of one cycle
+for n = 1:1:Nb_cycles
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rotary cycle of +X-X (phase 0-180), by an angle given in degrees by flip_angle
+PSeq = rotary_pulse(PSeq,sample_rate,flip_angle_rad/rabi_frequency/2/pi - mod(flip_angle_rad/rabi_frequency/2/pi,1/sample_rate),0,ch_on);
+PSeq = rotary_pulse(PSeq,sample_rate,flip_angle_rad/rabi_frequency/2/pi - mod(flip_angle_rad/rabi_frequency/2/pi,1/sample_rate),pi,ch_on);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+end
+
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Acquire Rotary and long-illumination 0 level reference
+PSeq = detection_and_acquire_ref(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+
+% Acquire 1 level reference 
+if do_adiabatic_inversion
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = adiabatic_inversion(PSeq,sample_rate,sweep_range,sweep_time,freqIQ,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+end
+
+% Acquiring true 0 level reference 
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);  
+
+% Acquiring Rabi to compare
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rabi pulse
+for n = 1:1:2*Nb_cycles
+PSeq = rabi_pulse(PSeq,sample_rate,flip_angle_rad/rabi_frequency/2/pi - mod(flip_angle_rad/rabi_frequency/2/pi,1/sample_rate),ch_on);
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+    	
+</instructions>
+
+</sequence>

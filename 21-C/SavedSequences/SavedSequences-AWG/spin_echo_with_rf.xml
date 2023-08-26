@@ -1,0 +1,65 @@
+<sequence>
+
+<variables>
+	
+sample_rate = float(200e6,1e7,5e9)
+mw_freq = float(1.7678e+09, 1e6, 15e9)
+mw_ampl = float(14, -20, 15)
+ampIQ = float(10,-30,17) %in dBmw
+freqIQ = float(50e6, 0,500*1e6)
+mod_s_pulse = float(1,0,1);
+s_pulse = float(15e-9,0,10e-6);
+length_pi_over_2 = float(15e-9,0,10e-6);
+delay_wrt_1mus = float(70e-9,0,500e-9); %calibrated by PL curve 11-08-05 13-17-48
+wait_time = float(100e-9, 0,1e-6);
+mod_rf = float(0.13,0,1);
+rf_freq = float(1e6,1e4,20e6);
+ampN = float(0,-20,20);
+length_rf_pulse = float(13e-6,0,100e-6);
+wait_time_after_rf = float(0,0,1000e-6);
+
+
+
+
+</variables>
+
+<shaped_pulses>
+
+</shaped_pulses>
+
+<instructions>
+
+ch_on =  [1 1 1 0 1];
+    
+PSeq = set_sample_rate(PSeq, sample_rate);
+
+PSeq = enable_channels(PSeq, 1:5,ch_on); 
+
+PSeq = set_microwave(PSeq, mw_freq, mw_ampl,ampIQ,freqIQ);
+
+PSeq = set_nitrogen_rf(PSeq, rf_freq, ampN);
+
+
+PSeq = polarize(PSeq,sample_rate,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%reference
+PSeq = rabi_pulse_mod(PSeq,sample_rate,2*length_pi_over_2,1,ch_on);
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus, ch_on);
+PSeq = wait_for_awg(PSeq,sample_rate,wait_time,ch_on);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Rabi pulse with rf
+PSeq = echo_envelope_with_rf5(PSeq,sample_rate,rf_freq,length_rf_pulse,1e-6,wait_time_after_rf,mod_rf,length_pi_over_2,s_pulse,mod_s_pulse,ch_on);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Acquire Rabi and long-illumination 0 level reference
+PSeq = detection(PSeq,sample_rate,delay_wrt_1mus,ch_on);
+
+
+
+
+</instructions>
+
+</sequence>
