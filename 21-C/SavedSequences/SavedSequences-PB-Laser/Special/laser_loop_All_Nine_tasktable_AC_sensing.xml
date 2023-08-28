@@ -146,13 +146,13 @@
            
            PSeq = ttl_pulse(PSeq, 18,total_wait_time, -total_wait_time, 1); 
             
-           PSeq = wait(PSeq,4); %wait until shuttling ends
-           PSeq= wait(PSeq, 4); %wait until tabor is set
+           PSeq = wait(PSeq, 4); %wait until shuttling ends
+           PSeq= wait(PSeq, 8); %wait until tabor is set
 
             PSeq = wait(PSeq,d1); %WAIT BEFORE TRIG
 
             %PSeq = ttl_pulse(PSeq, 3, 1e-3); %triggers VNMR pulse sequence and acquisition
-            PSeq = ttl_pulse(PSeq, 18, 10e-3, -10e-3, 1); %triggers Proteus pulse sequence and acquisition
+            PSeq = ttl_pulse(PSeq, 18, 10e-3); %triggers Proteus pulse sequence and acquisition
 
 
             if channel_vec(45)==1

@@ -1372,9 +1372,9 @@ classdef ExperimentFunctions < handle
                                     end
                                     disp('writing sage parameters');
 %                                           2/13 we decided to comment this out:  
-                                        pause(total_delay-1.03*Wait_time); %3 sec between reps
+%                                         pause(total_delay-1.03*Wait_time); %3 sec between reps
 % %                                             and replace it with this:
-%                                     pause(15);
+                                     pause(15);
                                         end
 
                                         %READ data from Sage and save
