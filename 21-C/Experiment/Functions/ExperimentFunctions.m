@@ -1414,34 +1414,24 @@ classdef ExperimentFunctions < handle
                                              end
                                          end
 
-                                        %For T1B symm.xml
-                                        %pause(-40+1.05*sum(durPB)+2*abs(abs(Position)-abs(c_position))/Velocity+3+tt2/1000); %3 sec between reps
-                                        pause(2);
+                                        if length(handles.Array_PSeq{1}.Channels)>=45 && handles.Array_PSeq{1}.Channels(45).Enable
+                                            % THIS 15 seconds pause is to have the pulseblaster ON, so
+                                            % that PB can trigger the pulse-sequence and the tektronix simultaneously
+                                            % Currently hardcoded to 15 seconds but shouldn't be the case.
+                                            pause(15);
+                                        end
 
-    %                                 elseif handles.Array_PSeq{1}.Channels(16).Enable %for odmr 
-    %                                     %handles.ExperimentFunctions.mw.AM100();
-    %                                     %%%%%%%%%%%%% Move to the Position
-    %                                     
-    %                                     [y, m, d, h, mn, t1] = datevec(now);                                  
-    %                                     for j1=1:floor(sum(durPB)/25e-3)
-    %                                     odnmr_data1(j1)=handles.ExperimentFunctions.gpib_LockInAmp.SigRead();
-    %                                     end
-    %                                     [y, m, d, h, mn, t2] = datevec(now);                                    
-    %                                     %pause(abs(1.1*sum(durPB)-abs(t2-t1))); 
-    %                                     wait_time=sum(durPB)-abs(t2-t1);
-    %                                     pause(round2(wait_time,0.1)+0.1);                                   
-    %                                     %time_read(rep_count) = abs(t2-t1);
                                     else
                                          pause(abs(1.1*sum(durPB)));
                                     end
 
 
                                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%important%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %                                 waitfor(handles.Imaginghandles.ImagingFunctions.interfacePulseGen.PBStop())
+                                    %waitfor(handles.Imaginghandles.ImagingFunctions.interfacePulseGen.PBStop())
                                     handles.Imaginghandles.ImagingFunctions.interfacePulseGen.PBStop();
                                     handles.Imaginghandles.ImagingFunctions.interfacePulseGen.PBReset();
                                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+                                    
                                 end
 
                                 if handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted==1
