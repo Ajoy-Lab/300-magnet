@@ -1419,6 +1419,8 @@ classdef ExperimentFunctions < handle
                                             % that PB can trigger the pulse-sequence and the tektronix simultaneously
                                             % Currently hardcoded to 15 seconds but shouldn't be the case.
                                             pause(15);
+                                        else
+                                            pause(2);
                                         end
 
                                     else
