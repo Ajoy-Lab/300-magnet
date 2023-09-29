@@ -1418,8 +1418,11 @@ classdef ExperimentFunctions < handle
                                             % THIS 15 seconds pause is to have the pulseblaster ON, so
                                             % that PB can trigger the pulse-sequence and the tektronix simultaneously
                                             % Currently hardcoded to 15 seconds but shouldn't be the case.
+                                            % we may need this to be elongated so that we can reaout properly 
                                             pause(15);
                                         else
+                                            % This limit as well.. ==> we
+                                            % do not want to go to 
                                             pause(2);
                                         end
 
@@ -1543,6 +1546,7 @@ classdef ExperimentFunctions < handle
                   
                           
                           %Sage_write('4'); %close communication to Sage
+                          pause(15);
                           Sage_write('4');
                           
                             %% READ SCOPE
