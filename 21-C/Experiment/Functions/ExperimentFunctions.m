@@ -1106,7 +1106,8 @@ classdef ExperimentFunctions < handle
                                 if handles.Array_PSeq{1}.Channels(24).Enable && ~handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted
                                     fliptime = handles.Array_PSeq{helper_scan,aux}.Channels(24).AmpIQ;
                                     waitpos = handles.Array_PSeq{helper_scan,aux}.Channels(24).Frequency;
-                                    postime = handles.Array_PSeq{helper_scan,aux}.Channels(24).Phase;
+                                    %postime = handles.Array_PSeq{helper_scan,aux}.Channels(24).Phase;
+                                    postime = handles.Array_PSeq{helper_scan,aux}.Channels(24).FreqmodQ; %ND Test
                                 elseif handles.Array_PSeq{1}.Channels(9).Enable && ~handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted
                                     waitpos = handles.Array_PSeq{helper_scan,aux}.Channels(9).Frequency; %change back to 9 for not T1
                                     postime = handles.Array_PSeq{helper_scan,aux}.Channels(9).Phase; %change back to 9 for not T1
@@ -1219,7 +1220,7 @@ classdef ExperimentFunctions < handle
 %                           (and 'postime' in this file)
                                         elseif length(handles.Array_PSeq{1}.Channels) > 38 && length(handles.Array_PSeq{1}.Channels) ~= 40 
                                             if handles.Array_PSeq{1}.Channels(38).Enable && ~handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted
-                                                obj.com.WriteVariable(postime,'V2', obj.com.ACSC_NONE);
+                                                obj.com.WriteVariable(postime*1e3,'V2',obj.com.ACSC_NONE); %ND updated to be written into Buffer with [ms]
                                                 obj.com.WriteVariable(fliptime*1e3,'V3', obj.com.ACSC_NONE);
                                                 obj.com.ToPoint(obj.com.ACSC_AMF_WAIT, obj.com.ACSC_AXIS_0,-c_position);  %go up to coil position
                                                 %obj.com.RunBuffer(8);
@@ -1331,8 +1332,11 @@ classdef ExperimentFunctions < handle
 %                                     Sage_write('9')
 %                                     pause(fliptime)
                                             
-                                    Sage_write('8')
-                                    
+                                    Sage_write('8');
+                                    n_sec_T1 = postime; %ND changed from hard-coded to written, automizable variable
+                                    fprintf(sprintf("pausing for %d seconds", n_sec_T1));
+                                    pause(n_sec_T1);
+                                    fprintf(sprintf("pause finished for %d seconds", n_sec_T1));
 %                                     pause(0.5)
                                     Sage_write('1') %QRF 
                                     
@@ -1562,7 +1566,7 @@ classdef ExperimentFunctions < handle
 %                             end
 
                         %pause(390);
-                          pause(240); 
+                          pause (240); %ND changed, but changed it back!
                           %pause(500);
                           if length(handles.Array_PSeq{1}.Channels)>=45 && handles.Array_PSeq{1}.Channels(45).Enable
                             %% turn off output of AFG 31000 and reset when experiment is finished.
