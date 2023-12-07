@@ -3,7 +3,7 @@ function Sage_write(n)
 %  Send script, for Automizer, aka Host 1
 %  For communication between PCs, replace '127.0.0.1' with
 % the DNS or DHCP (?) host name or IP address of Host 2
-u1 = udp('192.168.1.6', 'RemotePort', 9090, 'LocalPort', 2020);
+u1 = udp('192.168.1.3', 'RemotePort', 9090, 'LocalPort', 2020);
 u1.EnablePortSharing = 'on';
 try
 fopen(u1); % open the port

@@ -589,28 +589,7 @@ classdef ExperimentFunctions < handle
                                         % add custom chrip here.
 
                                         sweepers_en = 0;
-%                                         if symm==0
-%                                             %obj.tabor.awg_custom_chirp(srs_freq-(awg_center_freq+awg_bw_freq/2),srs_freq-(awg_center_freq-awg_bw_freq/2),awg_amp,0,1/sweep_freq,44,sweep_sigma,sweepers_en);
-%                                             obj.tabor.awg_chirp(srs_freq-(awg_center_freq+awg_bw_freq/2),srs_freq-(awg_center_freq-awg_bw_freq/2),awg_amp,0,1/sweep_freq,sweepers_en);
-%                                         elseif symm==1
-%                                             %obj.tabor.awg_custom_chirp(srs_freq-(awg_center_freq-awg_bw_freq/2),srs_freq-(awg_center_freq+awg_bw_freq/2),awg_amp,0,1/sweep_freq,44,sweep_sigma,sweepers_en);
-%                                             obj.tabor.awg_chirp(srs_freq-(awg_center_freq-awg_bw_freq/2),srs_freq-(awg_center_freq+awg_bw_freq/2),awg_amp,0,1/sweep_freq,sweepers_en);
-%                                         else
-%                                             obj.tabor.awg_custom_chirp(srs_freq-(awg_center_freq+awg_bw_freq/2),srs_freq-(awg_center_freq-awg_bw_freq/2),awg_amp,0,1/sweep_freq,44,sweep_sigma,sweepers_en);
-%                                         end
-    %                                     obj.tabor.awg_custom_chirp(0,1000,0.1,0,1e-2, 10);
 
-
-%                                         tic;    obj.tabor.awg_transfer();toc;
-
-%                                         % setup SRS
-%                                         obj.srs.set_freq(srs_freq);
-%                                         obj.srs.set_amp(srs_amp); %in dBm
-% 
-%                                         % turn both ON
-%                                         obj.srs.set_MWon();
-%                                         obj.tabor.awg_start();
-%                                         obj.tabor.seg=[]; %CLEAR MEMORY
                                         
                                         if length(handles.Array_PSeq{1}.Channels)>=46
                                             if handles.Array_PSeq{1}.Channels(46).Enable && ~handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted
@@ -690,169 +669,12 @@ classdef ExperimentFunctions < handle
                                             Tmaxlol=handles.Array_PSeq{helper_scan,aux+1}.Channels(44).Phasemod;
                                             rigol_rep=handles.Array_PSeq{helper_scan,aux+1}.Channels(42).SymmTime1;
                                         end
-                                    else
-%                                         pw=52;
-%                                         %d3=2;
-%     %                                     d3=53e-6;
-%                                         loop_num=700;
-%                                         sequence_type=2;% %                                    
-
-%     %                                        
-%                                            pw= 22;
-%                                            sequence_type=3;
-
-                                            pw=63;%41;%49;
-                                            %pw=68;
-%                                             pw3=77;
-                                            rigol_time1=29;
-                                            rigol_wait1=1;
-                                            rigol_time2=0;
-                                            rigol_wait2=0;
-                                            rigol_rep=1;
-                                            Tmaxlol=30;
-
-                                            sequence_type=2;
-%                                             sequence_type=handles.Array_PSeq{helper_scan,aux}.Channels(38).PhaseQ;
-                                            tacq=32;
-%                                             gain=18.5;
-                                            gain=19.25;
-
-% gain=10;
-                                            
-%                                            pw= 52;
-%                                             sequence_type=5;
-%                                             tof=-1.477640000000000e+04;
-
-%                                              pw= 22;
-%                                             sequence_type=1;
-                                            
-
                                     end
-
-                                    if sequence_type == 0
-                                        make_pw_nmr(pw,d3,loop_num);
-                                    elseif sequence_type == 1
-                                        make_pw_nmr_2(pw);
-                                    elseif sequence_type == 2 
-                                       pw_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Frequency;
-                                       tacq_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Phase;
-                                       gain_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).FreqIQ;
-                                       
-                                       if length(handles.Array_PSeq{1}.Channels)>=44 && handles.Array_PSeq{1}.Channels(44).Enable
-                                           pw3_current=handles.Array_PSeq{helper_scan,aux}.Channels(44).Frequency;
-                                           rigol_time1_current=handles.Array_PSeq{helper_scan,aux}.Channels(44).Ampmod;
-                                           rigol_wait1_current=handles.Array_PSeq{helper_scan,aux}.Channels(44).SymmTime1;
-                                           rigol_time2_current=handles.Array_PSeq{helper_scan,aux}.Channels(44).Phase;
-                                           rigol_wait2_current=handles.Array_PSeq{helper_scan,aux}.Channels(44).AmpIQ;
-                                           rigol_rep_current=handles.Array_PSeq{helper_scan,aux}.Channels(42).SymmTime1;
-                                           Tmax_current=handles.Array_PSeq{helper_scan,aux}.Channels(44).Phasemod;
-                                           %[nc,nc2,Tmax,Tmax2]= make_pw_nmr_12(pw_current,pw3_current,tacq_current,rigol_time1_current,Tmax_current);
-                                           [nc,nc2,nc3,Tmax,Tmax2]= make_pw_nmr_13(pw_current,pw3_current,tacq_current,rigol_time1_current+rigol_wait1_current,rigol_time2_current+rigol_wait2_current,Tmax_current,rigol_rep_current);
-                                       else
-                                           [nc,Tmax]= make_pw_nmr_8(pw_current,tacq_current,gain_current);
-                                           pause(0.1);
-                                           make_pw_nmr_8(pw,tacq,gain);
-                                       end
-                                        pause(0.1);
-                                        %for next cycle
-                                    if ~length(handles.Array_PSeq{1}.Channels)>=44 || ~handles.Array_PSeq{1}.Channels(44).Enable
-                                         make_pw_nmr_8(pw,tacq,gain);
-                                    else
-                                        %make_pw_nmr_12(pw,pw3,tacq,rigol_time1,Tmaxlol);
-                                        make_pw_nmr_13(pw,pw3,tacq,rigol_time1+rigol_wait1,rigol_time2+rigol_wait2, Tmaxlol,rigol_rep);
-                                    end
-                                        %write data to Sage
-%                                        Tmax=Tmax*12*1e-3;
-%                                        nc=nc*12;
-                                       %Tmax=Tmax*12*1e-3;
-                                       %Tmax=Tmax*1e-3;
-                                       %nc=nc*12;
-%                                      Sage_write(['2,',num2str(pw_current),',',num2str(nc),',',num2str(Tmax),',',num2str(tacq_current)]); %write to Sage for initializing readout
-%                                        disp('writing sage parameters');
-%                                           make_pw_nmr_3_rof(pw,d3);
-%                                           make_pw_nmr_3_rof(pw,2);
-                                    elseif sequence_type == 3
-                                        make_pw_nmr_4(pw);
-                                    elseif sequence_type == 4
-                                        %make_pw_nmr_5(pw,tpwr);
-                                         make_pw_nmr_5(79.4,pw);
-                                    elseif sequence_type == 5
-                                        tof=loop_num;
-                                        make_pw_nmr_6(pw,tof);
-                                    elseif sequence_type == 6
-                                        rof=d3;
-                                        make_pw_nmr_7(pw,rof);
-                                        
-%                                     Choose this sequence (type 7) for running FID.
-%                                     Remember to use make_pw_nmr_9 to
-%                                     populate these (initial) values.
-                                    elseif sequence_type == 7
-                                       pw_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Frequency;
-                                       tacq_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Phase;
-                                       gain_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).FreqIQ;
-                                       [nc,Tmax]= make_pw_nmr_9(pw_current,tacq_current,gain_current);
-                                        pause(0.1);
-                                        %for next cycle
-                                        make_pw_nmr_9(pw,tacq,gain);
-                                        %write data to Sage
-%                                        Tmax=Tmax*12*1e-3;
-%                                        nc=nc*12;
-                                       Tmax=tacq;
-                                       nc=1;
-%                                      Sage_write(['2,',num2str(pw_current),',',num2str(nc),',',num2str(Tmax),',',num2str(tacq_current)]); %write to Sage for initializing readout
-%                                        disp('writing sage parameters');
-
-%                                           make_pw_nmr_3_rof(pw,d3);
-%                                           make_pw_nmr_3_rof(pw,2);
-                                    elseif sequence_type == 8
-                                       pw_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Frequency;
-                                       tacq_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Phase;
-                                       gain_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).FreqIQ;
-                                       [nc,Tmax]= make_pw_nmr_7(pw_current,tacq_current,gain_current);
-                                        pause(0.1);
-                                        %for next cycle
-                                        make_pw_nmr_7(pw,tacq,gain);
-                                        %write data to Sage
-%                                        Tmax=Tmax*12*1e-3;
-%                                        nc=nc*12;
-%                                        Tmax=Tmax*1e-3;
-%                                        nc=nc*8;
-                                      
-%                                        Sage_write(['2,',num2str(pw_current),',',num2str(nc),',',num2str(Tmax),',',num2str(tacq_current)]); %write to Sage for initializing readout
-%                                        disp('writing sage parameters');
-%                                           make_pw_nmr_3_rof(pw,d3);
-%                                           make_pw_nmr_3_rof(pw,2);
-                                    elseif sequence_type == 9
-                                       pw_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Frequency;
-                                       tacq_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Phase;
-                                       gain_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).FreqIQ;
-                                       loop_num_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Amplitude;
-                                       [nc,Tmax]= make_pw_nmr_10(pw_current,tacq_current,gain_current);
-%                                        [nc,Tmax]= make_pw_nmr_10_2(pw_current,tacq_current,gain_current);
-%                                          [nc,Tmax]= make_pw_nmr_10_3(pw_current,tacq_current,gain_current);
-                                        pause(0.1);
-                                        %for next cycle
-                                        make_pw_nmr_10(pw,tacq,gain);
-%                                         make_pw_nmr_10_2(pw,tacq,gain);
-%                                         make_pw_nmr_10_3(pw,tacq,gain);
-                                        %write data to Sage
-                                      
-%                                        Sage_write(['2,',num2str(pw_current),',',num2str(nc),',',num2str(Tmax),',',num2str(tacq_current)]); %write to Sage for initializing readout
-%                                        disp('writing sage parameters');
-%                                           make_pw_nmr_3_rof(pw,d3);
-%                                           make_pw_nmr_3_rof(pw,2);
-                               
-                                    elseif sequence_type == 10 
-                                       pw_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Frequency;
-                                       Tmax2_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Amplitude;
-%                                        use 'loop_num' on GUI to set Tmax2
-                                       tacq_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Phase;
-                                       gain_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).FreqIQ;
-                                          [nc,nc2,Tmax,Tmax2]= make_pw_nmr_14(pw_current,Tmax2_current,gain_current);
-                                           pause(0.1);
-                                           make_pw_nmr_14(pw,Tmax2,gain);
-                                    end
-
+                                    pw_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Frequency;
+                                    tacq_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).Phase;
+                                    Tmax = handles.Array_PSeq{helper_scan,aux}.Channels(38).Parameter1;
+                                    sequence_type=handles.Array_PSeq{helper_scan,aux}.Channels(38).PhaseQ;
+                                    gain_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).FreqIQ;
                                     pause(0.2);
                                 end
 
@@ -1325,44 +1147,10 @@ classdef ExperimentFunctions < handle
 %                                                     obj.psu.PS_OUTOff();
                                                 end
                                             end
-                                    
-%                                     Flip polarization sign, xx more sec
-%                                     Sage_write('8')
-%                                     Sage_write('9')
-%                                     pause(fliptime)
-                                            
                                     Sage_write('8')
-                                    
-%                                     pause(0.5)
                                     Sage_write('1') %QRF 
-                                    
-                                    
-% % % % % % %                    FOR DTC experiments
-% %                                     With big delays: (N=300)
-%                                     nc=58800;
-%                                     Tmax=9.9668;
-%                                     tacq=128;
-                                    
-%                                     With medium delays: (N=300)
-%                                     nc=131072;
-% %                                 nc=9999+250*300;
-%                                     Tmax=30;
-%                                     tacq=64;
-                                    
-% %                                     With medium delays (N=200)
-%                                     if sequence_type==8
-% %                                         nc=130432;
-% %                                         Tmax=15;
-% %                                         tacq=64;
-% 
-%                                         Tmax=15;
-%                                         tacq=32;
-%                                     end
-
-% %                                     Single drive:
-%                                     nc=131072;
-%                                     Tmax=10;
-%                                     tacq=32;
+                                    % FOR NOW hardcode nc value
+                                    nc = 0;
                                     if length(handles.Array_PSeq{1}.Channels)>=44 && handles.Array_PSeq{1}.Channels(44).Enable
                                         Sage_write(['2,',num2str(pw_current),',',num2str(pw3_current),',',num2str(nc),',',num2str(nc2),',',num2str(rigol_wait1_current+rigol_time1_current),',',num2str(rigol_wait2_current+rigol_time2_current),',',num2str(tacq_current), ',', num2str(nc3),',',num2str(rigol_rep_current),',',num2str(Tmaxlol)]); %write to Sage for initializing readout
                                     elseif sequence_type == 10 % WHH-4 plus pulsed spin-lock
@@ -1377,10 +1165,6 @@ classdef ExperimentFunctions < handle
                                      pause(15);
                                         end
 
-                                        %READ data from Sage and save
-%                                         add this pause for measuring T1:
-%                                         pause(postime*1e-3);
-%                         pause(120);
                                         Sage_write('3');
                                         disp('Initializing Sage for measurement')
 
@@ -1562,7 +1346,7 @@ classdef ExperimentFunctions < handle
 %                             end
 
                         %pause(390);
-                          pause(240); 
+                          pause(360); 
                           %pause(500);
                           if length(handles.Array_PSeq{1}.Channels)>=45 && handles.Array_PSeq{1}.Channels(45).Enable
                             %% turn off output of AFG 31000 and reset when experiment is finished.

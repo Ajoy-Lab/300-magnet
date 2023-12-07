@@ -131,7 +131,7 @@
            PSeq = set_srs(PSeq,srs_freq,srs_amp);
             
             %%-----------NMR PARAMETERS--------------------------
-          PSeq = set_nmr_parameters(PSeq,pw,tacq,gain,tof,sequence_type);
+          PSeq = set_nmr_parameters(PSeq,pw,tacq,gain,tof,Tmax,sequence_type);
 
            %%-----------RIGOL FOR MAG--------------------------
                   PSeq = set_rigol_mag2(PSeq,rigol_Vpp,rigol_freq,mod_state,mod_freq,rigol_DC_offset,rigol_rep,M);
