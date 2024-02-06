@@ -1346,7 +1346,7 @@ classdef ExperimentFunctions < handle
 %                             end
 
                         %pause(390);
-                          pause(300); 
+                          pause(480); 
                           %pause(500);
                           if length(handles.Array_PSeq{1}.Channels)>=45 && handles.Array_PSeq{1}.Channels(45).Enable
                             %% turn off output of AFG 31000 and reset when experiment is finished.
