@@ -176,7 +176,7 @@
             PSeq = wait(PSeq,d1); %WAIT BEFORE TRIG
 
            PSeq = ttl_pulse(PSeq, 3, 1e-3); %triggers VNMR pulse sequence and acquisition
-            PSeq = ttl_pulse(PSeq, 18, 10e-3); %triggers Proteus pulse sequence and acquisition
+               %PSeq = ttl_pulse(PSeq, 18, 10e-3); %triggers Proteus pulse sequence and acquisition
 
 
             if channel_vec(42)==1

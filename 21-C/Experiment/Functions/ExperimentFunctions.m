@@ -1207,7 +1207,7 @@ classdef ExperimentFunctions < handle
                                         else
                                             % This limit as well.. ==> we
                                             % do not want to go to 
-                                            pause(45);
+                                            pause(2);
                                         end
 
                                     else
