@@ -391,7 +391,7 @@ handles.ExperimentFunctions.laserdome=Laser_Dome_Arduino('COM11','COM12','COM13'
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% SETUP Tektronix AFG 31000 for AC field generation for magnetometry
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-handles.ExperimentFunctions.tektronix_AFG_31000 = Tektronix_AFG_31000("USB0::0x0699::0x0355::C019986::INSTR");
+% handles.ExperimentFunctions.tektronix_AFG_31000 = Tektronix_AFG_31000("USB0::0x0699::0x0355::C019986::INSTR");
 
 %delay init and end seq
 handles.ExperimentFunctions.delay_init_and_end_seq = 0.1*1e-6; %s

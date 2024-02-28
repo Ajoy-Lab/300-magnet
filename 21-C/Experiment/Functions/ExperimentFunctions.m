@@ -657,7 +657,7 @@ classdef ExperimentFunctions < handle
                                     if aux<handles.ExperimentalScan.vary_points(1)
                                         pw=handles.Array_PSeq{helper_scan,aux+1}.Channels(38).Frequency;
                                         tacq=handles.Array_PSeq{helper_scan,aux+1}.Channels(38).Phase;
-                                        loop_num=handles.Array_PSeq{helper_scan,aux+1}.Channels(38).Amplitude;
+                                        tof=handles.Array_PSeq{helper_scan,aux+1}.Channels(38).Amplitude;
                                         sequence_type=handles.Array_PSeq{helper_scan,aux+1}.Channels(38).PhaseQ;
                                         gain=handles.Array_PSeq{helper_scan,aux+1}.Channels(38).FreqIQ;
                                         if length(handles.Array_PSeq{1}.Channels)>=44 && handles.Array_PSeq{1}.Channels(44).Enable
@@ -675,6 +675,8 @@ classdef ExperimentFunctions < handle
                                     Tmax = handles.Array_PSeq{helper_scan,aux}.Channels(38).Parameter1;
                                     sequence_type=handles.Array_PSeq{helper_scan,aux}.Channels(38).PhaseQ;
                                     gain_current=handles.Array_PSeq{helper_scan,aux}.Channels(38).FreqIQ;
+                                    tof=handles.Array_PSeq{helper_scan,aux}.Channels(38).Amplitude;
+                                    pi_pulse = handles.Array_PSeq{helper_scan,aux}.Channels(38).Parameter2;
                                     pause(0.2);
                                 end
 
@@ -1156,7 +1158,7 @@ classdef ExperimentFunctions < handle
                                     elseif sequence_type == 10 % WHH-4 plus pulsed spin-lock
                                         Sage_write(['2,',num2str(pw_current),',',num2str(nc+nc2),',',num2str(Tmax),',',num2str(tacq_current)]); %write to Sage for initializing readout
                                     else
-                                        Sage_write(['2,',num2str(pw_current),',',num2str(nc),',',num2str(Tmax),',',num2str(tacq_current)]); %write to Sage for initializing readout
+                                        Sage_write(['2,',num2str(pw_current),',',num2str(pi_pulse),',',num2str(Tmax),',',num2str(tacq_current),',',num2str(tof)]); %write to Sage for initializing readout
                                     end
                                     disp('writing sage parameters');
 %                                           2/13 we decided to comment this out:  
