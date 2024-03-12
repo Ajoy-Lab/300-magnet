@@ -608,9 +608,10 @@ classdef ExperimentFunctions < handle
                                                     num2str(poltime4),',',num2str(poltime5),',',num2str(poltime6),',',num2str(starting_pol_sign)]);         
                                                 disp('writing sage parameters');
                                                 toc
-                                                pause(25)
+                                                Pines_wait('6');
                                                 tic
                                                 Sage_write('7')
+                                                Pines_wait('7');
                                                 toc
                                             else
                                                 tic

@@ -1,12 +1,14 @@
 function Pines_wait(str_n)
-u2 = udp('192.168.1.3', 'RemotePort', 1901, 'LocalPort', 2020);
+u2 = udp('192.168.1.3', 'RemotePort', 1901, 'LocalPort', 2021);
 on = 1;
 off = 0;
 fopen(u2);
 t_counter = 0;
+sparse_t = 0;
 while(u2.BytesAvailable == 0)
-    if mod(t_counter, 1) < 1e-6
-        fprintf('This is TIME: %d \n', t_counter);
+    if t_counter >= sparse_t
+        fprintf('This is TIME: %.3f \n', t_counter);
+        sparse_t = sparse_t + 1;
     end
     t_counter = t_counter + 0.01;
     pause(0.01);
