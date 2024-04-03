@@ -608,10 +608,10 @@ classdef ExperimentFunctions < handle
                                                     num2str(poltime4),',',num2str(poltime5),',',num2str(poltime6),',',num2str(starting_pol_sign)]);         
                                                 disp('writing sage parameters');
                                                 toc
-                                                Pines_wait('6');
+                                                Pines_wait(2021,'6');
                                                 tic
                                                 Sage_write('7')
-                                                Pines_wait('7');
+                                                Pines_wait(2022,'7');
                                                 toc
                                             else
                                                 tic
@@ -931,7 +931,7 @@ classdef ExperimentFunctions < handle
                                 if handles.Array_PSeq{1}.Channels(24).Enable && ~handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted
                                     fliptime = handles.Array_PSeq{helper_scan,aux}.Channels(24).AmpIQ;
                                     waitpos = handles.Array_PSeq{helper_scan,aux}.Channels(24).Frequency;
-                                    postime = handles.Array_PSeq{helper_scan,aux}.Channels(24).Phase;
+                                    T1_wait_time = handles.Array_PSeq{helper_scan,aux}.Channels(24).Phase;
                                 elseif handles.Array_PSeq{1}.Channels(9).Enable && ~handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted
                                     waitpos = handles.Array_PSeq{helper_scan,aux}.Channels(9).Frequency; %change back to 9 for not T1
                                     postime = handles.Array_PSeq{helper_scan,aux}.Channels(9).Phase; %change back to 9 for not T1
@@ -1044,8 +1044,8 @@ classdef ExperimentFunctions < handle
 %                           (and 'postime' in this file)
                                         elseif length(handles.Array_PSeq{1}.Channels) > 38 && length(handles.Array_PSeq{1}.Channels) ~= 40 
                                             if handles.Array_PSeq{1}.Channels(38).Enable && ~handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted
-                                                obj.com.WriteVariable(postime,'V2', obj.com.ACSC_NONE);
-                                                obj.com.WriteVariable(fliptime*1e3,'V3', obj.com.ACSC_NONE);
+                                                obj.com.WriteVariable(T1_wait_time,'V2', obj.com.ACSC_NONE);
+                                                obj.com.WriteVariable(fliptime,'V3', obj.com.ACSC_NONE);
                                                 obj.com.ToPoint(obj.com.ACSC_AMF_WAIT, obj.com.ACSC_AXIS_0,-c_position);  %go up to coil position
                                                 %obj.com.RunBuffer(8);
                                                 obj.com.RunBuffer(8);
@@ -1349,7 +1349,9 @@ classdef ExperimentFunctions < handle
 %                             end
 
                         %pause(390);
-                          pause(300); 
+                          total_wait_time = 180+T1_wait_time*1e-3;
+                          fprintf("This is total wait time %.3f \n", total_wait_time);
+                          pause(total_wait_time); 
                           %pause(500);
                           if length(handles.Array_PSeq{1}.Channels)>=45 && handles.Array_PSeq{1}.Channels(45).Enable
                             %% turn off output of AFG 31000 and reset when experiment is finished.
