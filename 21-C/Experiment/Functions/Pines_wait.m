@@ -5,7 +5,7 @@ off = 0;
 fopen(u2);
 t_counter = 0;
 sparse_t = 0;
-while(u2.BytesAvailable == 0 || t_counter > 30)
+while(u2.BytesAvailable == 0 && t_counter < 30)
     if t_counter >= sparse_t
         fprintf('This is TIME: %.3f \n', t_counter);
         sparse_t = sparse_t + 1;

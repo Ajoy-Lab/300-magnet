@@ -1044,7 +1044,7 @@ classdef ExperimentFunctions < handle
 %                           (and 'postime' in this file)
                                         elseif length(handles.Array_PSeq{1}.Channels) > 38 && length(handles.Array_PSeq{1}.Channels) ~= 40 
                                             if handles.Array_PSeq{1}.Channels(38).Enable && ~handles.Imaginghandles.ImagingFunctions.interfaceDataAcq.hasAborted
-                                                obj.com.WriteVariable(T1_wait_time,'V2', obj.com.ACSC_NONE);
+                                                obj.com.WriteVariable(T1_wait_time*1e3,'V2', obj.com.ACSC_NONE);
                                                 obj.com.WriteVariable(fliptime,'V3', obj.com.ACSC_NONE);
                                                 obj.com.ToPoint(obj.com.ACSC_AMF_WAIT, obj.com.ACSC_AXIS_0,-c_position);  %go up to coil position
                                                 %obj.com.RunBuffer(8);
