@@ -1349,7 +1349,7 @@ classdef ExperimentFunctions < handle
 %                             end
 
                         %pause(390);
-                          total_wait_time = 180+T1_wait_time;
+                          total_wait_time = 360+T1_wait_time;
                           fprintf("This is total wait time %.3f \n", total_wait_time);
                           pause(total_wait_time); 
                           %pause(500);
