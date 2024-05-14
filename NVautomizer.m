@@ -197,7 +197,7 @@ function start_automizer_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 %fp = getpref('nv','SavedExpDirectory');
-fp='C:\300 magnet\21-C\SavedExperiments\';
+fp='C:\300-magnet\21-C\SavedExperiments\';
 a = datestr(now,'yyyy-mm-dd-HHMMSS');
 fn=['auto-' a];
 set(handles.automizer_file,'String',fn);
@@ -291,7 +291,7 @@ for automizer_expt_loop=1:size(handles.Experimentlist,2)
 
 %handles.pi_pulse=52e-9;
 % fp = getpref('nv','SavedSequenceDirectory');
-fp='C:\300 magnet\21-C\SavedSequences\SavedSequences-PB';
+fp='C:\300-magnet\21-C\SavedSequences\SavedSequences-PB';
 
 handles.automizer_expt_data=get(handles.automizer_expt,'Data');
 file=handles.automizer_expt_data{automizer_expt_loop};
@@ -512,7 +512,7 @@ function load_expt_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 %fp = getpref('nv','SavedSequenceDirectory');
-fp='C:\300 magnet\21-C\SavedSequences\SavedSequences-PB';
+fp='C:\300-magnet\21-C\SavedSequences\SavedSequences-PB';
 [file] = uigetfile('*.xml', 'Choose existing sequence file to load','MultiSelect','on',fp);
 file = cellstr(file)
 
@@ -1201,7 +1201,7 @@ function save_auto_Callback(hObject, eventdata, handles)
 % save_path=[fp '\' fn '.mat'];
 % save(save_path,'handles');
 
-fp='C:\300 magnet\21-C\SavedExperiments\';
+fp='C:\300-magnet\21-C\SavedExperiments\';
 % fp = getpref('nv','SavedExpDirectory');
 fn=get(handles.automizer_file,'String');
 save_path=[fp '\' fn '.mat'];
@@ -1243,7 +1243,7 @@ gobj = findall(0,'Name','NVautomizer');
 %handles = guidata(gobj);
 
 %fp = getpref('nv','SavedExpDirectory');
-fp='C:\300 magnet\21-C\SavedExperiments';
+fp='C:\300-magnet\21-C\SavedExperiments';
 handles.Arg_x=[];handles.Arg_y=[];handles.Arg_z=[];handles.file=[];
 [file] = uigetfile('*.mat', 'Choose existing sequence file to load',fp);
 load([fp '\' file]);

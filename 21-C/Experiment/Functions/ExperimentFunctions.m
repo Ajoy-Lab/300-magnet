@@ -178,7 +178,7 @@ classdef ExperimentFunctions < handle
                                 disp(['attenuation value = ' num2str(attenuation) 'is too low'])
                                 break
                             end
-                            dat1 = NET.addAssembly('C:\300 magnet\21-C\mcl_RUDAT64.dll');
+                            dat1 = NET.addAssembly('C:\300-magnet\21-C\mcl_RUDAT64.dll');
                             obj.att = mcl_RUDAT64.USB_RUDAT; 
                             obj.att.Connect();
                             obj.att.SetAttenuation(attenuation);

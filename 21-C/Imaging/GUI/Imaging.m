@@ -164,7 +164,7 @@ guidata(hObject,handles);
 
 function [hObject,handles] = InitDevices(hObject,handles)
 
-fp = 'C:\300 magnet\21-C\Initialization'; %getpref('nv','SavedInitializationDirectory');
+fp = 'C:\300-magnet\21-C\Initialization'; %getpref('nv','SavedInitializationDirectory');
 current_path = pwd;
 cd(fp);
 script = 'Imaging_InitScript.m';

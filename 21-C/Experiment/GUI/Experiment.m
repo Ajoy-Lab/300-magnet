@@ -74,7 +74,7 @@ guidata(hObject, handles);
 
 function [hObject,handles] = InitDevices(hObject,handles)
 
-fp = 'C:\300 magnet\21-C\Initialization';
+fp = 'C:\300-magnet\21-C\Initialization';
 current_path = pwd;
 cd(fp);
 script = 'Experiment_InitScript.m';

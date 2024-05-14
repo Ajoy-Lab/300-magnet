@@ -95,7 +95,7 @@ handles.flag_imaging = 1;
 gobj = findall(0,'Name','Imaging');
 set(gobj,'Position',[0    3.0769  272.0000   50.0769]);
 Experiment();
-NVpines();
+% NVpines();
 NVautomizer();
 LaserDomeGUI4(); %LASER DOME GUI
 Init_Stopwatch();

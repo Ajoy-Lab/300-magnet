@@ -314,8 +314,8 @@ instrreset;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% SETUP Circuit Specialist Power supply        %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%handles.ExperimentFunctions.psu=Prog_Supply('COM3');
- handles.ExperimentFunctions.psu2=Prog_Supply('COM17');
+handles.ExperimentFunctions.psu2=Prog_Supply('COM3');
+% handles.ExperimentFunctions.psu2=Prog_Supply('COM17');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% SETUP TABOR AWG    %
