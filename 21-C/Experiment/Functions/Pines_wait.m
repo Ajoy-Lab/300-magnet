@@ -21,5 +21,5 @@ if (u2.BytesAvailable ~= 0)
     assert(readBytes == str_n, "Sage need to end with the correctly indicated process")
 else
     fclose(u2);
-    fprintf("Case %s took longer than 30 seconds \n", readBytes);
+    fprintf("Sage_write did not happen in 30 seconds \n");
 end
